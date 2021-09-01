@@ -207,7 +207,7 @@ fn parse_expr<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> 
         return Ok((i, ident));
     }
 
-    todo!()
+    unreachable!()
 }
 
 fn parse_primary_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn Filter<T>>)> {
