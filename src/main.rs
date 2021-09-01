@@ -22,12 +22,15 @@ fn main() -> io::Result<()> {
         app: String,
     }
 
-    let f = parse_filter::<Message>("((!(ctx == app)) && (ts > 1000 && ts <= 9999)) || flags & 0x100 != 0").and_then(|x| {
+    parse_filter::<Message>("((!(ctx == app)) && (ts > 1000 && ts <= 9999)) || flags & 0x100 != 0").and_then(|x| {
         info!("Got: {}: {:#?}", x.0, x.1.as_ref());
         Ok(())
-    });
+    }).expect("parsed");
 
-    f.unwrap();
+    parse_filter::<Message>("flags & 0x100 != 0").and_then(|x| {
+        info!("Got: {}: {:#?}", x.0, x.1.as_ref());
+        Ok(())
+    }).expect("parsed");
 
     Ok(())
 }
