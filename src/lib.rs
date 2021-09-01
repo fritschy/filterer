@@ -48,9 +48,9 @@ use nom::{IResult, bytes::complete::{
 use std::collections::HashMap;
 use std::fmt::Debug;
 use nom::character::complete::{multispace0, satisfy};
-use nom::combinator::peek;
+use nom::combinator::{peek, fail, recognize};
 use nom::bytes::complete::take_till1;
-use nom::character::is_alphanumeric;
+use nom::character::{is_alphanumeric, is_hex_digit};
 use std::marker::PhantomData;
 use nom::branch::alt;
 
@@ -59,6 +59,7 @@ use tracing::{
     info,
 };
 use nom::number::complete::recognize_float;
+use nom::error::ParseError;
 
 pub trait Filter<T: Debug> : Debug {
     fn eval(&self, item: &T) -> bool;
@@ -207,7 +208,8 @@ fn parse_expr<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> 
         return Ok((i, ident));
     }
 
-    unreachable!()
+    // There is nothing we can do here
+    fail(i)
 }
 
 fn parse_primary_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn Filter<T>>)> {
@@ -229,7 +231,7 @@ fn parse_comparison_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Bo
 fn parse_secondary_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn Filter<T>>)> {
     trace!("parse_secondary_part: i={}", i);
     let (i, _) = multispace0(i)?;
-    let (i, op) = alt((tag("+"), tag("-")))(i)?;
+    let (i, op) = alt((tag("+"), tag("-"), tag("&"), tag("|"), tag("^")))(i)?;
     let (i, right) = parse_expr(i)?;
     Ok((i, (op, right)))
 }
@@ -265,7 +267,18 @@ fn parse_ident<T: Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> {
 fn numeric(i: &str) -> IResult<&str, &str> {
     trace!("numeric: i={}", i);
     let (i, _) = multispace0(i)?;
-    let (i, num) = recognize_float(i)?;
+    let (i, num) = alt((hexnum, recognize_float))(i)?;
+    Ok((i, num))
+}
+
+fn hexnum(i: &str) -> IResult<&str, &str> {
+    trace!("hexnum: i={}", i);
+    let (i, _) = multispace0(i)?;
+    let (i, num) = recognize(|i| {
+        trace!("recognize_hex: i={}", i);
+        let (i, _) = tag("0x")(i)?;
+        take_till1(|x| !is_hex_digit(x as u8))(i)
+    })(i)?;
     Ok((i, num))
 }
 
