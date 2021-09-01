@@ -22,7 +22,7 @@ fn main() -> io::Result<()> {
         app: String,
     }
 
-    let f = parse_filter::<Message>("(!(ctx == app)) && ts > 1000").and_then(|x| {
+    let f = parse_filter::<Message>("(!(ctx == app)) && (ts > 1000 && ts <= 9999)").and_then(|x| {
         info!("Got: {}: {:#?}", x.0, x.1.as_ref());
         Ok(())
     });

@@ -19,7 +19,7 @@ use tracing::{error as log_error, Level};
 // SECONDARY = EXPR '+' EXPR
 //           | EXPR '-' EXPR
 // COMPARISON = EXPR COMPOP EXPR
-// COMPOP = '>' | '<' | '==' | '>=' | '<='
+// COMPOP = '>' | '<' | '==' | '>=' | '<=' | '!='
 // LOGIC = EXPR '&&' EXPR
 //       | EXPR '||' EXPR
 // CONST = NUMBER | STRING
@@ -154,11 +154,7 @@ pub struct FilterContext<T> {
 
 pub fn parse_filter<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> {
     trace!("parse_filter: i={}", i);
-    let (i, expr) = parse_expr(i)?;
-    // there need to be arbitrary number of && || chained...
-    if let Ok((i, (op, right))) = parse_logic_part::<T>(i) {
-        return Ok((i, Box::new(BinaryOp::<T>::new(expr, op, right))));
-    }
+    let (i, expr) = parse_chained_expr(i)?;
     Ok((i, expr))
 }
 
@@ -166,8 +162,18 @@ fn parse_logic_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn
     trace!("parse_logic_part: i={}", i);
     let (i, _) = multispace0(i)?;
     let (i, op) = alt((tag("&&"), tag("||")))(i)?;
-    let (i, right) = parse_expr(i)?;
+    let (i, right) = parse_chained_expr(i)?;
     Ok((i, (op, right)))
+}
+
+fn parse_chained_expr<T: 'static + Debug>(i: &str) ->  IResult<&str, Box<dyn Filter<T>>> {
+    trace!("parse_chained_expr: i={}", i);
+    let (i, expr) = parse_expr(i)?;
+    if let Ok((i, (op, right))) = parse_logic_part(i) {
+        Ok((i, Box::new(BinaryOp::<T>::new(expr, op, right)) as Box<dyn Filter<T>>))
+    } else {
+        Ok((i, expr))
+    }
 }
 
 fn parse_expr<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> {
@@ -175,7 +181,7 @@ fn parse_expr<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> 
     let (i, _) = multispace0(i)?;
     // Is this a parenthesized expression?
     if let Ok((i, _)) = tag::<&str, &str, nom::error::Error<&str>>("(")(i) {
-        let (i, expr) = parse_expr(i)?;
+        let (i, expr) = parse_chained_expr(i)?;
         let (i, _) = multispace0(i)?;
         let (i, _) = tag(")")(i)?;
         return Ok((i, expr));
@@ -201,7 +207,7 @@ fn parse_expr<T: 'static + Debug>(i: &str) -> IResult<&str, Box<dyn Filter<T>>> 
         return Ok((i, ident));
     }
 
-    todo!();
+    todo!()
 }
 
 fn parse_primary_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn Filter<T>>)> {
@@ -215,7 +221,7 @@ fn parse_primary_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<d
 fn parse_comparison_part<T: 'static + Debug>(i: &str) -> IResult<&str, (&str, Box<dyn Filter<T>>)> {
     trace!("parse_comparison_part: i={}", i);
     let (i, _) = multispace0(i)?;
-    let (i, op) = alt((tag(">"), tag("<"), tag("=="), tag("!="), tag(">="), tag("<=")))(i)?;
+    let (i, op) = alt((tag("=="), tag("!="), tag(">="), tag("<="), tag(">"), tag("<")))(i)?;
     let (i, right) = parse_expr(i)?;
     Ok((i, (op, right)))
 }
