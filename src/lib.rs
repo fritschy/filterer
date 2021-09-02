@@ -108,7 +108,7 @@ pub mod nom_parser {
                 "|" => BinaryOp::Bor,
                 "&&" => BinaryOp::And,
                 "||" => BinaryOp::Or,
-                _ => panic!("Unknown operator {}", i),
+                _ => unreachable!("Unknown operator {}", i),
             }
         }
     }
@@ -118,7 +118,7 @@ pub mod nom_parser {
             match i {
                 "!" => UnaryOp::Not,
                 "-" => UnaryOp::Neg,
-                _ => panic!("Unaknown operator {}", i),
+                _ => unreachable!("Unaknown operator {}", i),
             }
         }
     }
@@ -326,37 +326,27 @@ pub mod nom_parser {
         Ok((i, Node::from_numeric(num)))
     }
 
-    fn hexnum(i: &str) -> IResult<&str, &str> {
-        trace!("hexnum: i={}", i);
+    fn prefixed_num<'a>(i: &'a str, pfx: &'_ str, is_digit: impl Fn(u8) -> bool) -> IResult<&'a str, &'a str> {
+        trace!("prefixed_num: i={}", i);
         let (i, _) = multispace0(i)?;
         let (i, num) = recognize(|i| {
-            trace!("recognize_hex: i={}", i);
-            let (i, _) = tag("0x")(i)?;
-            take_till1(|x| !is_hex_digit(x as u8))(i)
+            trace!("recognize_num: i={}", i);
+            let (i, _) = tag(pfx)(i)?;
+            take_till1(|x| !is_digit(x as u8))(i)
         })(i)?;
         Ok((i, num))
+    }
+
+    fn hexnum(i: &str) -> IResult<&str, &str> {
+        prefixed_num(i, "0x", is_hex_digit)
     }
 
     fn octnum(i: &str) -> IResult<&str, &str> {
-        trace!("octnum: i={}", i);
-        let (i, _) = multispace0(i)?;
-        let (i, num) = recognize(|i| {
-            trace!("recognize_hex: i={}", i);
-            let (i, _) = tag("0o")(i)?;
-            take_till1(|x| !is_oct_digit(x as u8))(i)
-        })(i)?;
-        Ok((i, num))
+        prefixed_num(i, "0o", is_oct_digit)
     }
 
     fn binnum(i: &str) -> IResult<&str, &str> {
-        trace!("binnum: i={}", i);
-        let (i, _) = multispace0(i)?;
-        let (i, num) = recognize(|i| {
-            trace!("recognize_hex: i={}", i);
-            let (i, _) = tag("0b")(i)?;
-            take_till1(|x| x != '0' && x != '1')(i)
-        })(i)?;
-        Ok((i, num))
+        prefixed_num(i, "0b", |x| x == b'0' || x == b'1')
     }
 }
 
