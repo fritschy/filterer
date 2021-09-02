@@ -29,7 +29,7 @@ use tracing::{info, trace};
 
 pub mod ast {
     use nom::combinator::{map, eof};
-    use nom::sequence::delimited;
+    use nom::sequence::{delimited, preceded};
 
     use crate::ast::Node::{Binary, Constant, Identifier, Unary, StringLiteral};
 
@@ -254,13 +254,14 @@ pub mod ast {
         Ok((i, f))
     }
 
+    // FIXME: this one sucks particularly HARD
     fn string(i: &str) -> IResult<&str, Box<Node>> {
         let (i, s) = delimited(
             tag("\""),
             recognize(move |i| {
                 let mut i = i;
                 loop {
-                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((tag("\\\""), take_till1(|x| x == '"')))(i) {
+                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((escaped_char, take_till1(|x| x == '\\' || x == '"')))(i) {
                         i = r;
                     } else {
                         break;
@@ -270,6 +271,22 @@ pub mod ast {
             }),
             tag("\""))(i)?;
         Ok((i, Box::new(StringLiteral(s.to_string()))))
+    }
+
+    fn escaped_char(i: &str) -> IResult<&str, &str> {
+        preceded(tag("\\"),
+            alt((
+                tag("\""),
+                tag("\\"),
+                tag("n"),
+                tag("r"),
+                tag("0"),
+                tag("f"),
+                tag("b"),
+                tag("t"),
+                tag("v"),
+            ))
+        )(i)
     }
 
     fn parens_expr(i: &str) -> IResult<&str, Box<Node>> {
