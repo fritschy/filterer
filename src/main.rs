@@ -1,8 +1,7 @@
 use tracing_subscriber::FmtSubscriber;
 use tracing::{Level, info, error as log_err};
-use filterer::{ast};
+use filterer::{nom_parser};
 use std::io;
-use std::io::BufRead;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -11,7 +10,7 @@ fn main() -> io::Result<()> {
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::TRACE)
         // completes the builder.
         //.with_thread_names(true)
         .finish();
@@ -38,7 +37,7 @@ fn main() -> io::Result<()> {
                 Ok(l) => {
                     rl.add_history_entry(l.as_str());
 
-                    if let Err(e) = ast::parse(l.trim()).and_then(|x| {
+                    if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
                         info!("Got: {}: {:#?}", x.0, x.1.as_ref());
                         Ok(())
                     }) {
@@ -61,7 +60,7 @@ fn main() -> io::Result<()> {
         }
         rl.save_history("history.txt").unwrap();
     } else {
-        ast::parse("(flags & 0x100) != 0 && ts <= 10101").and_then(|x| {
+        nom_parser::parse("flags & 0x100 != 0b0 && ts <= 0o10101").and_then(|x| {
             info!("Got: {}: {:#?}", x.0, x.1.as_ref());
             Ok(())
         }).expect("parsed");

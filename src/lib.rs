@@ -1,18 +1,3 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-
-use nom::branch::alt;
-use nom::bytes::complete::take_till1;
-use nom::character::complete::{multispace0, satisfy};
-use nom::character::{is_alphanumeric, is_hex_digit};
-use nom::combinator::{fail, peek, recognize};
-use nom::error::ParseError;
-use nom::number::complete::recognize_float;
-use nom::{bytes::complete::tag, AsChar, IResult};
-use tracing::{error as log_error, Level};
-use tracing::{info, trace};
-
 // Examples:
 // ctx =~ "AP.*" || ctx == "MAP"             # match ctx against re, or ctx equals to "MAP"
 // app == "REND" && payload =~ ".*error.*"   # app == "REND" AND payload contains "error"
@@ -27,14 +12,22 @@ use tracing::{info, trace};
 //
 // How to implement chaining of logic operators, i.e. EXPR && EXPR?
 
-pub mod ast {
-    use nom::combinator::{map, eof};
+pub mod nom_parser {
+    use std::fmt::Debug;
+
+    use nom::branch::alt;
+    use nom::bytes::complete::take_till1;
+    use nom::character::complete::{multispace0, satisfy};
+    use nom::character::is_oct_digit;
+    use nom::character::{is_alphanumeric, is_hex_digit};
+    use nom::combinator::{eof, map};
+    use nom::combinator::{peek, recognize};
+    use nom::number::complete::recognize_float;
     use nom::sequence::{delimited, preceded};
+    use nom::{bytes::complete::tag, AsChar, IResult};
+    use tracing::trace;
 
-    use crate::ast::Node::{Binary, Constant, Identifier, Unary, StringLiteral};
-
-    use super::*;
-    use nom::character::complete::anychar;
+    use Node::{Binary, Unary};
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -71,10 +64,10 @@ pub mod ast {
         Match, // A =~ B
 
         Band, // A &  B
-        Bor, // A |  B
+        Bor,  // A |  B
 
         And, // A && B
-        Or, // A || B
+        Or,  // A || B
     }
 
     // A pest.rs grammar
@@ -98,27 +91,6 @@ pub mod ast {
     // or = { "||" }
     // and = { "&&" }
     // WHITESPACE = _{ " " | "\t" }
-    //
-    // Example: a_1 & 0x10a != 0 || (ts > 1000 && ts < 99999)
-    // - simpleExpr
-    //   - andExpr > relExpr
-    //     - sumExpr
-    //       - unaryExpr > factor > identifier: "a_1"
-    //       - sumop: "&"
-    //       - sumExpr > unaryExpr > factor > numeral: "0x10a"
-    //     - relop: "!="
-    //     - relExpr > sumExpr > unaryExpr > factor > numeral: "0"
-    //   - or: "||"
-    //   - simpleExpr > andExpr > relExpr > sumExpr > unaryExpr > factor > parensExpr > expr > simpleExpr > andExpr
-    //     - relExpr
-    //       - sumExpr > unaryExpr > factor > identifier: "ts"
-    //       - relop: ">"
-    //       - relExpr > sumExpr > unaryExpr > factor > numeral: "1000"
-    //     - and: "&&"
-    //     - andExpr > relExpr
-    //       - sumExpr > unaryExpr > factor > identifier: "ts"
-    //       - relop: "<"
-    //       - relExpr > sumExpr > unaryExpr > factor > numeral: "99999"
 
     impl From<&str> for BinaryOp {
         fn from(i: &str) -> Self {
@@ -157,10 +129,11 @@ pub mod ast {
         fn from_numeric(i: &str) -> Box<Node> {
             Box::new(Node::Constant(i.to_string()))
         }
-    }
 
-    // What we want:
-    // A & 0x100 != 0    ->    Binary{Binary{'A', Band, 0x100}, Ne, 0}
+        fn from_string(i: &str) -> Box<Node> {
+            Box::new(Node::StringLiteral(i.to_string()))
+        }
+    }
 
     pub fn parse(i: &str) -> IResult<&str, Box<Node>> {
         trace!("parse: i={}", i);
@@ -183,7 +156,8 @@ pub mod ast {
                 let (i, _) = multispace0(i)?;
                 let (i, op) = map(tag("||"), BinaryOp::from)(i)?;
                 let (i, se) = simple_expr(i)?;
-                Ok((i, Box::new(Binary { lhs: ae, op, rhs: se, }), ))
+                Ok((i, Box::new(Binary { lhs: ae, op, rhs: se, }),
+                ))
             },
             and_expr,
         ))(i)
@@ -256,12 +230,17 @@ pub mod ast {
 
     // FIXME: this one sucks particularly HARD
     fn string(i: &str) -> IResult<&str, Box<Node>> {
+        trace!("string: i={}", i);
         let (i, s) = delimited(
             tag("\""),
             recognize(move |i| {
                 let mut i = i;
                 loop {
-                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((escaped_char, take_till1(|x| x == '\\' || x == '"')))(i) {
+                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((
+                        escaped_char,
+                        take_till1(|x| x == '\\' || x == '"'),
+                    ))(i)
+                    {
                         i = r;
                     } else {
                         break;
@@ -269,12 +248,15 @@ pub mod ast {
                 }
                 Ok((i, ""))
             }),
-            tag("\""))(i)?;
-        Ok((i, Box::new(StringLiteral(s.to_string()))))
+            tag("\""),
+        )(i)?;
+        Ok((i, Node::from_string(s)))
     }
 
     fn escaped_char(i: &str) -> IResult<&str, &str> {
-        preceded(tag("\\"),
+        trace!("escaped_char: i={}", i);
+        preceded(
+            tag("\\"),
             alt((
                 tag("\""),
                 tag("\\"),
@@ -285,7 +267,7 @@ pub mod ast {
                 tag("b"),
                 tag("t"),
                 tag("v"),
-            ))
+            )),
         )(i)
     }
 
@@ -318,14 +300,14 @@ pub mod ast {
         let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
         let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
         let (i, _) = multispace0(i)?;
-        Ok((i, Box::new(Identifier(ident.to_string()))))
+        Ok((i, Node::from_identifier(ident)))
     }
 
     fn numeric(i: &str) -> IResult<&str, Box<Node>> {
         trace!("numeric: i={}", i);
         let (i, _) = multispace0(i)?;
-        let (i, num) = alt((hexnum, recognize_float))(i)?;
-        Ok((i, Box::new(Constant(num.to_string()))))
+        let (i, num) = alt((hexnum, octnum, binnum, recognize_float))(i)?;
+        Ok((i, Node::from_numeric(num)))
     }
 
     fn hexnum(i: &str) -> IResult<&str, &str> {
@@ -338,12 +320,32 @@ pub mod ast {
         })(i)?;
         Ok((i, num))
     }
+
+    fn octnum(i: &str) -> IResult<&str, &str> {
+        trace!("octnum: i={}", i);
+        let (i, _) = multispace0(i)?;
+        let (i, num) = recognize(|i| {
+            trace!("recognize_hex: i={}", i);
+            let (i, _) = tag("0o")(i)?;
+            take_till1(|x| !is_oct_digit(x as u8))(i)
+        })(i)?;
+        Ok((i, num))
+    }
+
+    fn binnum(i: &str) -> IResult<&str, &str> {
+        trace!("binnum: i={}", i);
+        let (i, _) = multispace0(i)?;
+        let (i, num) = recognize(|i| {
+            trace!("recognize_hex: i={}", i);
+            let (i, _) = tag("0b")(i)?;
+            take_till1(|x| x != '0' && x != '1')(i)
+        })(i)?;
+        Ok((i, num))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
