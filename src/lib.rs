@@ -31,9 +31,10 @@ pub mod ast {
     use nom::combinator::{map, eof};
     use nom::sequence::delimited;
 
-    use crate::ast::Node::{Binary, Constant, Identifier, Unary};
+    use crate::ast::Node::{Binary, Constant, Identifier, Unary, StringLiteral};
 
     use super::*;
+    use nom::character::complete::anychar;
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -48,6 +49,7 @@ pub mod ast {
         },
         Identifier(String),
         Constant(String),
+        StringLiteral(String),
     }
 
     #[derive(Debug, Clone)]
@@ -248,8 +250,26 @@ pub mod ast {
     fn factor(i: &str) -> IResult<&str, Box<Node>> {
         trace!("factor: i={}", i);
         let (i, _) = multispace0(i)?;
-        let (i, f) = alt((identifier, numeric, parens_expr))(i)?;
+        let (i, f) = alt((identifier, numeric, string, parens_expr))(i)?;
         Ok((i, f))
+    }
+
+    fn string(i: &str) -> IResult<&str, Box<Node>> {
+        let (i, s) = delimited(
+            tag("\""),
+            recognize(move |i| {
+                let mut i = i;
+                loop {
+                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((tag("\\\""), take_till1(|x| x == '"')))(i) {
+                        i = r;
+                    } else {
+                        break;
+                    }
+                }
+                Ok((i, ""))
+            }),
+            tag("\""))(i)?;
+        Ok((i, Box::new(StringLiteral(s.to_string()))))
     }
 
     fn parens_expr(i: &str) -> IResult<&str, Box<Node>> {

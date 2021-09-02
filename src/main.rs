@@ -3,6 +3,8 @@ use tracing::{Level, info, error as log_err};
 use filterer::{ast};
 use std::io;
 use std::io::BufRead;
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 fn main() -> io::Result<()> {
     // a builder for `FmtSubscriber`.
@@ -24,22 +26,40 @@ fn main() -> io::Result<()> {
     }
 
     if std::env::args().nth(1).unwrap_or("".to_string()) == "-i" {
-        let stdin = std::io::stdin();
-        let stdin = stdin.lock();
-        for l in stdin.lines() {
-            if l.is_err() {
-                break;
-            }
+        // `()` can be used when no completer is required
+        let mut rl = Editor::<()>::new();
+        if rl.load_history("history.txt").is_err() {
+            println!("No previous history.");
+        }
 
-            let l = l.unwrap();
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(l) => {
+                    rl.add_history_entry(l.as_str());
 
-            if let Err(e) = ast::parse(l.trim()).and_then(|x| {
-                info!("Got: {}: {:#?}", x.0, x.1.as_ref());
-                Ok(())
-            }) {
-                log_err!("Got error: {:?}", e);
+                    if let Err(e) = ast::parse(l.trim()).and_then(|x| {
+                        info!("Got: {}: {:#?}", x.0, x.1.as_ref());
+                        Ok(())
+                    }) {
+                        log_err!("Got error: {:?}", e);
+                    }
+                },
+                Err(ReadlineError::Interrupted) => {
+                    info!("CTRL-C");
+                    break
+                },
+                Err(ReadlineError::Eof) => {
+                    info!("CTRL-D");
+                    break
+                },
+                Err(err) => {
+                    log_err!("Error: {:?}", err);
+                    break
+                }
             }
         }
+        rl.save_history("history.txt").unwrap();
     } else {
         ast::parse("(flags & 0x100) != 0 && ts <= 10101").and_then(|x| {
             info!("Got: {}: {:#?}", x.0, x.1.as_ref());
