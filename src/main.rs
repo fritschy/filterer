@@ -28,7 +28,7 @@ fn main() -> io::Result<()> {
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         // completes the builder.
         //.with_thread_names(true)
         .finish();

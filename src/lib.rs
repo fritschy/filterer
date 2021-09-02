@@ -26,6 +26,8 @@ pub mod nom_parser {
     use tracing::trace;
 
     use Node::{Binary, Unary};
+    use nom::multi::{fold_many0};
+    use crate::nom_parser::Node::List;
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -37,6 +39,10 @@ pub mod nom_parser {
             lhs: Box<Node>,
             op: BinaryOp,
             rhs: Box<Node>,
+        },
+        List {
+            lst: Vec<Box<Node>>,
+            op: BinaryOp,
         },
         Identifier(String),
         Constant(String),
@@ -135,6 +141,44 @@ pub mod nom_parser {
         fn from_string(i: &str) -> Box<Node> {
             Box::new(Node::StringLiteral(i.to_string()))
         }
+
+        fn from_list(i: Node) -> Box<Node> {
+            Box::new(i)
+        }
+
+        fn push(&mut self, i: Box<Node>) {
+            match self {
+                List { ref mut lst, op: _ } => lst.push(i),
+                _ => unreachable!(),
+            }
+        }
+
+        fn is_empty(&self) -> bool {
+            match self {
+                List { ref lst, op: _ } => lst.is_empty(),
+                _ => unreachable!(),
+            }
+        }
+
+        fn len(&self) -> usize {
+            match self {
+                List { ref lst, op: _ } => lst.len(),
+                _ => 0,
+            }
+        }
+
+        fn unwrap(&self) -> Box<Node> {
+            match self {
+                List { ref lst, op: _ } => {
+                    if lst.len() == 1 {
+                        return lst[0].clone();
+                    } else {
+                        panic!("Cannot unwrap a list with len > 1");
+                    }
+                }
+                _ => Box::new(self.clone()),
+            }
+        }
     }
 
     pub fn parse(i: &str) -> IResult<&str, Box<Node>> {
@@ -147,32 +191,53 @@ pub mod nom_parser {
     fn simple_expr(i: &str) -> IResult<&str, Box<Node>> {
         trace!("simple_expr: i={}", i);
         let (i, _) = multispace0(i)?;
-        alt((
+        let (i, ae) = and_expr(i)?;
+        let (i, l) = fold_many0(
             move |i| {
-                let (i, ae) = and_expr(i)?;
                 let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("||"), BinaryOp::from)(i)?;
-                let (i, se) = simple_expr(i)?;
-                Ok((i, Box::new(Binary { lhs: ae, op, rhs: se, }),
-                ))
+                let (i, _) = map(tag("||"), BinaryOp::from)(i)?;
+                simple_expr(i)
             },
-            and_expr,
-        ))(i)
+            || List { op: BinaryOp::from("||"), lst: Vec::new() },
+            |mut acc, x| {
+                acc.push(x);
+                acc
+            }
+        )(i)?;
+
+        if l.is_empty() {
+            Ok((i, ae))
+        } else if l.len() == 1 {
+            Ok((i, Box::new(Binary { lhs: ae, op: BinaryOp::from("||"), rhs: l.unwrap() })))
+        } else {
+            Ok((i, Box::new(Binary { lhs: ae, op: BinaryOp::from("||"), rhs: Node::from_list(l) })))
+        }
     }
 
     fn and_expr(i: &str) -> IResult<&str, Box<Node>> {
         trace!("and_expr: i={}", i);
         let (i, _) = multispace0(i)?;
-        alt((
+        let (i, re) = rel_expr(i)?;
+        let (i, l) = fold_many0(
             move |i| {
-                let (i, re) = rel_expr(i)?;
                 let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("&&"), BinaryOp::from)(i)?;
-                let (i, ae) = and_expr(i)?;
-                Ok((i, Box::new(Binary { lhs: re, op, rhs: ae, }), ))
+                let (i, _) = map(tag("&&"), BinaryOp::from)(i)?;
+                and_expr(i)
             },
-            rel_expr,
-        ))(i)
+            || List { op: BinaryOp::from("&&"), lst: Vec::new() },
+            |mut acc, x| {
+                acc.push(x);
+                acc
+            }
+        )(i)?;
+
+        if l.is_empty() {
+            Ok((i, re))
+        } else if l.len() == 1 {
+            Ok((i, Box::new(Binary { lhs: re, op: BinaryOp::from("&&"), rhs: l.unwrap() })))
+        } else {
+            Ok((i, Box::new(Binary { lhs: re, op: BinaryOp::from("&&"), rhs: Node::from_list(l) })))
+        }
     }
 
     fn rel_expr(i: &str) -> IResult<&str, Box<Node>> {
@@ -193,16 +258,27 @@ pub mod nom_parser {
     fn sum_expr(i: &str) -> IResult<&str, Box<Node>> {
         trace!("sum_expr: i={}", i);
         let (i, _) = multispace0(i)?;
-        alt((
+        let (i, ue) = unary_expr(i)?;
+        let (i, l) = fold_many0(
             move |i| {
-                let (i, ue) = unary_expr(i)?;
                 let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("&"), BinaryOp::from)(i)?;
-                let (i, se) = sum_expr(i)?;
-                Ok((i, Box::new(Binary { lhs: ue, op, rhs: se, }), ))
+                let (i, _) = map(tag("&"), BinaryOp::from)(i)?;
+                sum_expr(i)
             },
-            unary_expr,
-        ))(i)
+            || List { op: BinaryOp::from("&"), lst: Vec::new() },
+            |mut acc, x| {
+                acc.push(x);
+                acc
+            }
+        )(i)?;
+
+        if l.is_empty() {
+            Ok((i, ue))
+        } else if l.len() == 1 {
+            Ok((i, Box::new(Binary { lhs: ue, op: BinaryOp::from("&"), rhs: l.unwrap() })))
+        } else {
+            Ok((i, Box::new(Binary { lhs: ue, op: BinaryOp::from("&"), rhs: Node::from_list(l) })))
+        }
     }
 
     fn unary_expr(i: &str) -> IResult<&str, Box<Node>> {
