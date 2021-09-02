@@ -1,9 +1,27 @@
 use tracing_subscriber::FmtSubscriber;
 use tracing::{Level, info, error as log_err};
-use filterer::{nom_parser};
+use filterer::{nom_parser, pest_parser};
 use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+
+use pest::Parser;
+
+fn doit(l: &str) {
+    if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
+        info!("Got: {}: {:#?}", x.0, x.1.as_ref());
+        Ok(())
+    }) {
+        log_err!("Got error: {:?}", e);
+    }
+
+    if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).and_then(|x| {
+        info!("Got: {}", x);
+        Ok(())
+    }) {
+        log_err!("Got error: {:?}", e);
+    }
+}
 
 fn main() -> io::Result<()> {
     // a builder for `FmtSubscriber`.
@@ -18,12 +36,6 @@ fn main() -> io::Result<()> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
 
-    #[derive(Debug)]
-    struct Message {
-        ctx: String,
-        app: String,
-    }
-
     if std::env::args().nth(1).unwrap_or("".to_string()) == "-i" {
         // `()` can be used when no completer is required
         let mut rl = Editor::<()>::new();
@@ -36,13 +48,7 @@ fn main() -> io::Result<()> {
             match readline {
                 Ok(l) => {
                     rl.add_history_entry(l.as_str());
-
-                    if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
-                        info!("Got: {}: {:#?}", x.0, x.1.as_ref());
-                        Ok(())
-                    }) {
-                        log_err!("Got error: {:?}", e);
-                    }
+                    doit(&l);
                 },
                 Err(ReadlineError::Interrupted) => {
                     info!("CTRL-C");
@@ -60,10 +66,7 @@ fn main() -> io::Result<()> {
         }
         rl.save_history("history.txt").unwrap();
     } else {
-        nom_parser::parse("flags & 0x100 != 0b0 && ts <= 0o10101").and_then(|x| {
-            info!("Got: {}: {:#?}", x.0, x.1.as_ref());
-            Ok(())
-        }).expect("parsed");
+        doit("flags & 0x100 != 0b0 && ts <= 0o10101");
     }
 
     Ok(())

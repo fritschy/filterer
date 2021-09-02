@@ -16,15 +16,13 @@ pub mod nom_parser {
     use std::fmt::Debug;
 
     use nom::branch::alt;
-    use nom::bytes::complete::take_till1;
+    use nom::bytes::complete::{tag, take_till1};
     use nom::character::complete::{multispace0, satisfy};
-    use nom::character::is_oct_digit;
-    use nom::character::{is_alphanumeric, is_hex_digit};
-    use nom::combinator::{eof, map};
-    use nom::combinator::{peek, recognize};
+    use nom::character::{is_alphanumeric, is_hex_digit, is_oct_digit};
+    use nom::combinator::{eof, map, peek, recognize};
     use nom::number::complete::recognize_float;
     use nom::sequence::{delimited, preceded};
-    use nom::{bytes::complete::tag, AsChar, IResult};
+    use nom::{AsChar, IResult};
     use tracing::trace;
 
     use Node::{Binary, Unary};
@@ -70,7 +68,11 @@ pub mod nom_parser {
         Or,  // A || B
     }
 
-    // A pest.rs grammar
+    // A pest.rs grammar,
+    // Couple of notes though:
+    // * WITESPACE should ne done explicitly
+    // * string parsing is missin
+    // * octal and binary numerals are missing
     //
     // expr = { SOI ~ simpleExpr ~ EOI }
     // simpleExpr = { andExpr ~ or ~ simpleExpr | andExpr }
@@ -137,14 +139,9 @@ pub mod nom_parser {
 
     pub fn parse(i: &str) -> IResult<&str, Box<Node>> {
         trace!("parse: i={}", i);
-        let (i, e) = expr(i)?;
+        let (i, e) = simple_expr(i)?;
         let (i, _) = eof(i)?;
         Ok((i, e))
-    }
-
-    fn expr(i: &str) -> IResult<&str, Box<Node>> {
-        trace!("expr: i={}", i);
-        simple_expr(i)
     }
 
     fn simple_expr(i: &str) -> IResult<&str, Box<Node>> {
@@ -342,6 +339,12 @@ pub mod nom_parser {
         })(i)?;
         Ok((i, num))
     }
+}
+
+pub mod pest_parser {
+    #[derive(pest_derive::Parser, Debug, Clone)]
+    #[grammar = "filter.pest"]
+    pub struct Filter;
 }
 
 #[cfg(test)]

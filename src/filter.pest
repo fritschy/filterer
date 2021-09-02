@@ -1,0 +1,25 @@
+expr = { SOI ~ simpleExpr ~ EOI }
+simpleExpr = { andExpr ~ or ~ simpleExpr | andExpr }
+andExpr = { relExpr ~ and ~ andExpr | relExpr }
+relExpr = { sumExpr ~ relop ~ relExpr | sumExpr }
+sumExpr = { unaryExpr ~ sumop ~ sumExpr | unaryExpr }
+relop = { "==" | "!=" | ">=" | "<=" | ">" | "<" | "=~" }
+sumop = { "&" }
+unaryExpr = { unaryOp ~ unaryExpr | factor }
+unaryOp = { "!" | "-" }
+factor = { identifier | numeral | string | parensExpr }
+string = { dquote ~ stringChars ~ dquote }
+dquote = { "\"" }
+stringChars = { (quoteChar | ASCII_ALPHANUMERIC | (chars))* }
+chars = { "." | "~" | "*" | "(" | ")" | "{" | "}" | "[" | "]" }
+quoteChar = { "\\" ~ ("\"" | "\\" | "n" | "r" | "t" | "f" | "v" | "0" ) }
+xchars = { !"\"" }
+parensExpr = { "(" ~ expr ~ ")" }
+identifier = @{ name }
+nameHead = { ASCII_ALPHA | "_" }
+nameTail = { ASCII_ALPHANUMERIC | "_" }
+name = { nameHead ~ nameTail* | nameHead+ }
+numeral = @{ ("0x" ~ ASCII_HEX_DIGIT+) | ("0o" ~ ASCII_OCT_DIGIT+) | ("0b" ~ ASCII_BIN_DIGIT+) | ASCII_DIGIT+ }
+or = { "||" }
+and = { "&&" }
+WHITESPACE = _{ " " | "\t" }
