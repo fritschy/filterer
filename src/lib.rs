@@ -394,6 +394,10 @@ pub mod nom_parser {
         use regex::Regex;
         use super::{Node, BinaryOp, UnaryOp};
 
+        pub fn parse_num(i: &str) -> isize {
+            super::parse_num(i).unwrap_or(0)
+        }
+
         pub trait Accessor {
             fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String>;
         }
@@ -405,19 +409,6 @@ pub mod nom_parser {
         // FIXME: this is quickest and most inefficient way I could possibly imagine!
         impl Eval<&dyn Accessor> for Box<Node> {
             fn eval_filter(&self, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> bool {
-                fn parse_num(i: &str) -> isize {
-                    let r = if let Some(i) = i.strip_prefix("0x") {
-                        isize::from_str_radix(i, 16)
-                    } else if let Some(i) = i.strip_prefix("0o") {
-                        isize::from_str_radix(i, 8)
-                    } else if let Some(i) = i.strip_prefix("0b") {
-                        isize::from_str_radix(i, 2)
-                    } else {
-                        i.parse::<isize>()
-                    };
-                    r.unwrap_or(0)
-                }
-
                 fn value(node: &Node, e: &dyn Accessor) -> Option<String> {
                     match node {
                         Node::StringLiteral(s) => Some(s.clone()),
@@ -525,16 +516,71 @@ pub mod nom_parser {
     }
 }
 
-pub mod pest_parser {
-    #[derive(pest_derive::Parser, Debug, Clone)]
-    #[grammar = "filter.pest"]
-    pub struct Filter;
-}
+// pub mod pest_parser {
+//     #[derive(pest_derive::Parser, Debug, Clone)]
+//     #[grammar = "filter.pest"]
+//     pub struct Filter;
+// }
 
 #[cfg(test)]
 mod tests {
+    use super::nom_parser::*;
+    use eval::*;
+    use std::collections::HashMap;
+
+    type Data<'a> = &'a str;
+
+    const DATA: &[Data<'static>] = &["abc", "cde", "ahi", "10a", "0x100", "0x200", "0o12", "0b101", "\"\\\"moo\\\""];
+
+    impl<'a> Accessor for Data<'a> {
+        fn ident<'b>(&'b self, k: &str) -> Result<&'a str, String> {
+            if k == "d" {
+                Ok(self)
+            } else {
+                Err("Unknown identifier".to_string())
+            }
+        }
+    }
+
+    // Compare expr filter with iter filter
+    fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
+        let mut re_cache = HashMap::new();
+        let p = parse(expr).expect("parsed");
+        assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m, &mut re_cache)).map(|m| *m).collect::<Vec<&str>>(),
+                   DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
+    }
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn simple() {
+        // match all
+        compare("1", |_| true);
+        compare("!0", |_| true);
+
+        // match none
+        compare("0", |_| false);
+        compare("!1", |_| false);
+        compare("0b0 || -0o0 || does_not_exist", |_| false);
+
+        // simple re
+        compare("d =~ \"a\"", |x| regex::Regex::new("a").unwrap().is_match(x));
+        compare("!(d =~ \"a\")", |x| !regex::Regex::new("a").unwrap().is_match(x));
+
+        // Some number relops
+        compare("d >= 0x100 && d <= 0x200 && d", |x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && **x != "0");
+        compare("d > 0xff && d < 0x201 && d", |x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && **x != "0");
+
+        // str compare
+        compare("d == \"ahi\"", |x| **x == "ahi");
+        compare("d != \"ahi\"", |x| **x != "ahi");
+    }
+
+    #[test]
+    fn errors() {
+        println!("{}", parse("1+2").unwrap_err().describe());
+        println!("{}", parse("d =! \"eins\"").unwrap_err().describe());
+        println!("{}", parse("d !& \"eins\"").unwrap_err().describe());
+        println!("{}", parse("(").unwrap_err().describe());
+        println!("{}", parse(")").unwrap_err().describe());
+        println!("{}", parse("\"").unwrap_err().describe());
     }
 }
