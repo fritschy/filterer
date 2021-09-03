@@ -27,7 +27,7 @@ impl Accessor for Message {
             "app"    => &self.app,
             "level"  => &self.level,
             "ts"     => &self.ts,
-            _ => Err(format!("Unknown identifier: {}", k))?,
+            _ => return Err(format!("Unknown identifier: {}", k)),
         })
     }
 }
@@ -43,7 +43,7 @@ fn messages() -> Vec<Message> {
 }
 
 fn doit(l: &str) {
-    if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
+    if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
         info!("Got: {:#?}", x.as_ref());
         let mut count = 0;
         let mut re_cache = HashMap::new();
@@ -55,15 +55,12 @@ fn doit(l: &str) {
         }
 
         info!("matched {}/{} messages", count, messages().len());
-
-        Ok(())
     }) {
         log_err!("{}", e);
     }
 
-    if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).and_then(|_x| {
+    if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|_x| {
         //info!("Got: {}", x);
-        Ok(())
     }) {
         log_err!("Got error: {:?}", e);
     }

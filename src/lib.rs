@@ -21,7 +21,7 @@ pub mod nom_parser {
     use nom::number::complete::recognize_float;
     use nom::sequence::{delimited, preceded};
     use nom::{AsChar, Finish, IResult, Offset};
-    use tracing::{error as log_err, trace};
+    use tracing::trace;
 
     use std::fmt;
     use std::num::ParseIntError;
@@ -99,14 +99,14 @@ pub mod nom_parser {
     }
 
     fn parse_num(i: &str) -> Result<isize, ParseIntError> {
-        if i.starts_with("0x") {
-            isize::from_str_radix(&i[2..], 16)
-        } else if i.starts_with("0o") {
-            isize::from_str_radix(&i[2..], 8)
-        } else if i.starts_with("0b") {
-            isize::from_str_radix(&i[2..], 2)
+        if let Some(i) = i.strip_prefix("0x") {
+            isize::from_str_radix(i, 16)
+        } else if let Some(i) = i.strip_prefix("0o") {
+            isize::from_str_radix(i, 8)
+        } else if let Some(i) = i.strip_prefix("0b") {
+            isize::from_str_radix(i, 2)
         } else {
-            isize::from_str_radix(i, 10)
+            i.parse::<isize>()
         }
     }
 
@@ -180,7 +180,6 @@ pub mod nom_parser {
                         let ei = &e.input;
                         let sei = ei as &str;
                         let pos = i.as_bytes().offset(sei.as_bytes());
-                        log_err!("Error at position {}: '{}'", pos, i);
                         return Err(ParseError::new(i, pos, format!("Error at offset {}", pos)));
                     }
                     _ => unreachable!(),
@@ -406,27 +405,27 @@ pub mod nom_parser {
         impl Eval<&dyn Accessor> for Box<Node> {
             fn eval_filter(&self, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> bool {
                 fn parse_num(i: &str) -> isize {
-                    let r = if i.starts_with("0x") {
-                        isize::from_str_radix(&i[2..], 16)
-                    } else if i.starts_with("0o") {
-                        isize::from_str_radix(&i[2..], 8)
-                    } else if i.starts_with("0b") {
-                        isize::from_str_radix(&i[2..], 2)
+                    let r = if let Some(i) = i.strip_prefix("0x") {
+                        isize::from_str_radix(i, 16)
+                    } else if let Some(i) = i.strip_prefix("0o") {
+                        isize::from_str_radix(i, 8)
+                    } else if let Some(i) = i.strip_prefix("0b") {
+                        isize::from_str_radix(i, 2)
                     } else {
-                        isize::from_str_radix(i, 10)
+                        i.parse::<isize>()
                     };
                     r.unwrap_or(0)
                 }
 
-                fn value(node: &Box<Node>, e: &dyn Accessor) -> Option<String> {
-                    match node.as_ref() {
+                fn value(node: &Node, e: &dyn Accessor) -> Option<String> {
+                    match node {
                         Node::StringLiteral(s) => Some(s.clone()),
                         Node::Constant(s) => Some(s.clone()),
                         Node::Identifier(s) => {
-                            e.ident(&s).ok().map(|x| {
+                            e.ident(s).ok().map(|x| {
                                 // info!("identifier: x={}", x);
                                 let num = parse_num(x);
-                                let snum = format!("{}", x);
+                                let snum = x.to_string();
                                 // Is this a number?
                                 if num != 0 && snum != "0" {
                                     snum
@@ -443,13 +442,11 @@ pub mod nom_parser {
                     if v { "1".into() } else { "0".into() }
                 }
 
-                fn eval(node: &Box<Node>, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> String {
-                    match node.as_ref() {
+                fn eval(node: &Node, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> String {
+                    match node {
                         Node::Binary { rhs, op, lhs } => {
                             let l = eval(lhs, e, re_cache);
                             let r = eval(rhs, e, re_cache);
-
-                            // info!("l={}, r={}", &l, &r);
 
                             match op {
                                 BinaryOp::And => {
@@ -493,7 +490,6 @@ pub mod nom_parser {
                                     let le = parse_num(&l) as usize;
                                     let re = parse_num(&r) as usize;
                                     let res = format!("{}", le & re);
-                                    // info!("BAnd, le={}, re={}, res={}", le, re, res);
                                     res
                                 },
                                 BinaryOp::Bor => unreachable!(),
@@ -515,7 +511,7 @@ pub mod nom_parser {
                     }
                 }
 
-                eval(&self, e, re_cache) != "0"
+                eval(self, e, re_cache) != "0"
             }
         }
     }
