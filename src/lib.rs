@@ -456,21 +456,33 @@ pub mod nom_parser {
                                 },
 
                                 BinaryOp::Eq  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l == r)
                                 },
                                 BinaryOp::Ne  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l != r)
                                 },
                                 BinaryOp::Ge  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l >= r)
                                 },
                                 BinaryOp::Gt  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l >  r)
                                 },
                                 BinaryOp::Le  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l <= r)
                                 },
                                 BinaryOp::Lt  => {
+                                    let l = parse_num(&l);
+                                    let r = parse_num(&r);
                                     ret(l <  r)
                                 },
                                 BinaryOp::Match => {
@@ -501,7 +513,7 @@ pub mod nom_parser {
                                     ret(eval(expr, e, re_cache) == "0")
                                 }
                                 UnaryOp::Neg => {
-                                    format!("{}", -parse_num(&eval(expr, e, re_cache)))
+                                    (-parse_num(&eval(expr, e, re_cache))).to_string()
                                 }
                             }
                         }
