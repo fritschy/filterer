@@ -133,6 +133,7 @@ trait Accessor {
 
 #[derive(Debug)]
 struct Message {
+    ts: String,
     flags: String,
     ctx: String,
     app: String,
@@ -142,10 +143,11 @@ struct Message {
 impl Accessor for Message {
     fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String> {
         Ok(match k {
-            "flags" => &self.flags,
-            "ctx"  => &self.ctx,
-            "app"  => &self.app,
+            "flags"  => &self.flags,
+            "ctx"    => &self.ctx,
+            "app"    => &self.app,
             "level"  => &self.level,
+            "ts"     => &self.ts,
             _ => Err(format!("Unknown identifier: {}", k))?,
         })
     }
@@ -153,11 +155,11 @@ impl Accessor for Message {
 
 fn messages() -> Vec<Message> {
     vec![
-        Message { flags: "0x300".into(), ctx: "render".into(), app: "HMI2".into(), level: "0".into() },
-        Message { flags: "0x301".into(), ctx: "render".into(), app: "HMI1".into(), level: "0".into() },
-        Message { flags: "0x201".into(), ctx: "menu".into(),   app: "HMI".into(),  level: "3".into() },
-        Message { flags: "0x300".into(), ctx: "map".into(),    app: "MAP".into(),  level: "1".into() },
-        Message { flags: "0x004".into(), ctx: "intersection".into(), app: "SideMAP".into(), level: "1".into() },
+        Message { ts: "0".into(), flags: "0x300".into(), ctx: "render".into(), app: "HMI2".into(), level: "0".into() },
+        Message { ts: "100".into(), flags: "0x301".into(), ctx: "render".into(), app: "HMI1".into(), level: "0".into() },
+        Message { ts: "101".into(), flags: "0x201".into(), ctx: "menu".into(),   app: "HMI".into(),  level: "3".into() },
+        Message { ts: "200".into(), flags: "0x300".into(), ctx: "map".into(),    app: "MAP".into(),  level: "1".into() },
+        Message { ts: "300".into(), flags: "0x004".into(), ctx: "intersection".into(), app: "SideMAP".into(), level: "1".into() },
     ]
 }
 
