@@ -386,6 +386,139 @@ pub mod nom_parser {
     fn binnum(i: Input) -> IResult<Input, Input> {
         prefixed_num("0b", |x| x == b'0' || x == b'1', i)
     }
+
+    pub mod eval {
+        // quick and hacked implementation of an expression evaluation
+
+        use std::collections::HashMap;
+        use regex::Regex;
+        use super::{Node, BinaryOp, UnaryOp};
+
+        pub trait Accessor {
+            fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String>;
+        }
+
+        pub trait Eval<T> {
+            fn eval_filter(&self, e: T, re_cache: &mut HashMap<String, Regex>) -> bool;
+        }
+
+        // FIXME: this is quickest and most inefficient way I could possibly imagine!
+        impl Eval<&dyn Accessor> for Box<Node> {
+            fn eval_filter(&self, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> bool {
+                fn parse_num(i: &str) -> isize {
+                    let r = if i.starts_with("0x") {
+                        isize::from_str_radix(&i[2..], 16)
+                    } else if i.starts_with("0o") {
+                        isize::from_str_radix(&i[2..], 8)
+                    } else if i.starts_with("0b") {
+                        isize::from_str_radix(&i[2..], 2)
+                    } else {
+                        isize::from_str_radix(i, 10)
+                    };
+                    r.unwrap_or(0)
+                }
+
+                fn value(node: &Box<Node>, e: &dyn Accessor) -> Option<String> {
+                    match node.as_ref() {
+                        Node::StringLiteral(s) => Some(s.clone()),
+                        Node::Constant(s) => Some(s.clone()),
+                        Node::Identifier(s) => {
+                            e.ident(&s).ok().map(|x| {
+                                // info!("identifier: x={}", x);
+                                let num = parse_num(x);
+                                let snum = format!("{}", x);
+                                // Is this a number?
+                                if num != 0 && snum != "0" {
+                                    snum
+                                } else {
+                                    x.into()
+                                }
+                            })
+                        },
+                        _ => None,
+                    }
+                }
+
+                fn ret(v: bool) -> String {
+                    if v { "1".into() } else { "0".into() }
+                }
+
+                fn eval(node: &Box<Node>, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> String {
+                    match node.as_ref() {
+                        Node::Binary { rhs, op, lhs } => {
+                            let l = eval(lhs, e, re_cache);
+                            let r = eval(rhs, e, re_cache);
+
+                            // info!("l={}, r={}", &l, &r);
+
+                            match op {
+                                BinaryOp::And => {
+                                    ret(l != "0" && r != "0")
+                                },
+                                BinaryOp::Or  => {
+                                    ret(l != "0" || r != "0")
+                                },
+
+                                BinaryOp::Eq  => {
+                                    ret(l == r)
+                                },
+                                BinaryOp::Ne  => {
+                                    ret(l != r)
+                                },
+                                BinaryOp::Ge  => {
+                                    ret(l >= r)
+                                },
+                                BinaryOp::Gt  => {
+                                    ret(l >  r)
+                                },
+                                BinaryOp::Le  => {
+                                    ret(l <= r)
+                                },
+                                BinaryOp::Lt  => {
+                                    ret(l <  r)
+                                },
+                                BinaryOp::Match => {
+                                    let re = re_cache.entry(r.clone());
+                                    let re = re.or_insert_with(move || {
+                                        if let Ok(re) = regex::Regex::new(&r) {
+                                            re
+                                        } else {
+                                            panic!("Invalid regular expression");
+                                        }
+                                    });
+                                    ret(re.is_match(&l))
+                                },
+
+                                BinaryOp::Band => {
+                                    let le = parse_num(&l) as usize;
+                                    let re = parse_num(&r) as usize;
+                                    let res = format!("{}", le & re);
+                                    // info!("BAnd, le={}, re={}, res={}", le, re, res);
+                                    res
+                                },
+                                BinaryOp::Bor => unreachable!(),
+                            }
+                        }
+
+                        Node::Unary { op, expr } => {
+                            match op {
+                                UnaryOp::Not => {
+                                    ret(eval(expr, e, re_cache) == "0")
+                                }
+                                UnaryOp::Neg => {
+                                    format!("{}", -parse_num(&eval(expr, e, re_cache)))
+                                }
+                            }
+                        }
+
+                        _ => value(node, e).unwrap_or_else(|| "0".into()),
+                    }
+                }
+
+                eval(&self, e, re_cache) != "0"
+            }
+        }
+    }
 }
 
 pub mod pest_parser {
