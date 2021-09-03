@@ -1,5 +1,5 @@
 use tracing_subscriber::FmtSubscriber;
-use tracing::{Level, info, error as log_err};
+use tracing::{Level, info, trace, error as log_err};
 use filterer::{nom_parser, pest_parser};
 use std::io;
 use rustyline::error::ReadlineError;
@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 use pest::Parser;
 use filterer::nom_parser::{Node, BinaryOp, UnaryOp};
+use regex::Regex;
 
 fn parse_num(i: &str) -> isize {
     let r = if i.starts_with("0x") {
@@ -24,12 +25,12 @@ fn parse_num(i: &str) -> isize {
 }
 
 trait Eval<T> {
-    fn filter(&self, e: &T) -> bool;
+    fn filter(&self, e: &T, re_cache: &mut HashMap<String, Regex>) -> bool;
 }
 
 // FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<Message> for Box<Node> {
-    fn filter(&self, e: &Message) -> bool {
+    fn filter(&self, e: &Message, re_cache: &mut HashMap<String, Regex>) -> bool {
         fn value(node: &Box<Node>, e: &Message) -> Option<String> {
             match node.as_ref() {
                 Node::StringLiteral(s) => Some(s.clone()),
@@ -55,11 +56,11 @@ impl Eval<Message> for Box<Node> {
             if v { "1".into() } else { "0".into() }
         }
 
-        fn eval(node: &Box<Node>, e: &Message) -> String {
+        fn eval(node: &Box<Node>, e: &Message, re_cache: &mut HashMap<String, Regex>) -> String {
             match node.as_ref() {
                 Node::Binary { rhs, op, lhs } => {
-                    let l = eval(lhs, e);
-                    let r = eval(rhs, e);
+                    let l = eval(lhs, e, re_cache);
+                    let r = eval(rhs, e, re_cache);
 
                     // info!("l={}, r={}", &l, &r);
 
@@ -90,11 +91,15 @@ impl Eval<Message> for Box<Node> {
                             ret(l <  r)
                         },
                         BinaryOp::Match => {
-                            if let Ok(re) = regex::Regex::new(&r) {
-                                ret(re.is_match(&l))
-                            } else {
-                                ret(l == r)
-                            }
+                            let re = re_cache.entry(r.clone());
+                            let re = re.or_insert_with(move || {
+                                if let Ok(re) = regex::Regex::new(&r) {
+                                    re
+                                } else {
+                                    panic!("Invalid regular expression");
+                                }
+                            });
+                            ret(re.is_match(&l))
                         },
 
                         BinaryOp::Band => {
@@ -111,10 +116,10 @@ impl Eval<Message> for Box<Node> {
                 Node::Unary { op, expr } => {
                     match op {
                         UnaryOp::Not => {
-                            ret(eval(expr, e) == "0")
+                            ret(eval(expr, e, re_cache) == "0")
                         }
                         UnaryOp::Neg => {
-                            format!("{}", -parse_num(&eval(expr, e)))
+                            format!("{}", -parse_num(&eval(expr, e, re_cache)))
                         }
                     }
                 }
@@ -123,7 +128,7 @@ impl Eval<Message> for Box<Node> {
             }
         }
 
-        eval(&self, e) != "0"
+        eval(&self, e, re_cache) != "0"
     }
 }
 
@@ -166,11 +171,16 @@ fn messages() -> Vec<Message> {
 fn doit(l: &str) {
     if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
         info!("Got: {:#?}", x.as_ref());
+        let mut count = 0;
+        let mut re_cache = HashMap::new();
         for m in messages().iter() {
-            if x.filter(m) {
+            if x.filter(m, &mut re_cache) {
+                count += 1;
                 info!("{:?}", m);
             }
         }
+
+        info!("matched {}/{} messages", count, messages().len());
 
         Ok(())
     }) {
