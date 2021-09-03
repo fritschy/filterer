@@ -17,14 +17,14 @@ pub mod nom_parser {
     use nom::bytes::complete::{tag, take_till1};
     use nom::character::complete::{multispace0, satisfy};
     use nom::character::{is_alphanumeric, is_hex_digit, is_oct_digit};
-    use nom::combinator::{eof, map, peek, recognize, opt};
+    use nom::combinator::{eof, map, opt, peek, recognize};
     use nom::number::complete::recognize_float;
     use nom::sequence::{delimited, preceded};
-    use nom::{AsChar, IResult, Finish, Offset};
-    use tracing::{trace, error as log_err};
+    use nom::{AsChar, Finish, IResult, Offset};
+    use tracing::{error as log_err, trace};
 
-    use Node::{Binary, Unary};
     use std::fmt;
+    use Node::{Binary, Unary};
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -120,11 +120,7 @@ pub mod nom_parser {
 
     impl<'a> ParseError<'a> {
         fn new(input: &'a str, pos: usize, msg: String) -> Self {
-            Self {
-                input,
-                pos,
-                msg
-            }
+            Self { input, pos, msg }
         }
 
         pub fn describe(&self) -> String {
@@ -159,7 +155,6 @@ pub mod nom_parser {
                     _ => unreachable!(),
                 }
             }
-
         }
     }
 
@@ -173,23 +168,28 @@ pub mod nom_parser {
 
     // Implement simple_expr, and_expr, rel_expr and sum_expr through this:
     fn generic_expr<'a>(
-            opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
-            nextp: &impl Fn(Input) -> IResult<Input, Box<Node>>,
-            i: &'a str)
-        -> IResult<&'a str, Box<Node>> {
+        opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
+        nextp: &impl Fn(Input) -> IResult<Input, Box<Node>>,
+        i: &'a str,
+    ) -> IResult<&'a str, Box<Node>> {
         let (i, _) = multispace0(i)?;
         let (i, ae) = nextp(i)?;
-        let (i, on) = opt(
-            move |i| {
-                let (i, _) = multispace0(i)?;
-                let (i, op) = opp(i)?;
-                let (i, se) = generic_expr(opp, nextp, i)?;
-                Ok((i, (op, se)))
-            }
-        )(i)?;
+        let (i, on) = opt(move |i| {
+            let (i, _) = multispace0(i)?;
+            let (i, op) = opp(i)?;
+            let (i, se) = generic_expr(opp, nextp, i)?;
+            Ok((i, (op, se)))
+        })(i)?;
 
         if let Some((op, n)) = on {
-            Ok((i, Box::new(Binary { lhs: ae, op, rhs: n })))
+            Ok((
+                i,
+                Box::new(Binary {
+                    lhs: ae,
+                    op,
+                    rhs: n,
+                }),
+            ))
         } else {
             Ok((i, ae))
         }
@@ -200,7 +200,7 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(tag("||"), BinaryOp::from)(i),
             &move |i| and_expr(i),
-            i
+            i,
         )
     }
 
@@ -209,7 +209,7 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(tag("&&"), BinaryOp::from)(i),
             &move |i| rel_expr(i),
-            i
+            i,
         )
     }
 
@@ -218,7 +218,7 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(relop, BinaryOp::from)(i),
             &move |i| sum_expr(i),
-            i
+            i,
         )
     }
 
@@ -227,7 +227,7 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(tag("&"), BinaryOp::from)(i),
             &move |i| unary_expr(i),
-            i
+            i,
         )
     }
 
@@ -247,33 +247,34 @@ pub mod nom_parser {
     fn factor(i: Input) -> IResult<Input, Box<Node>> {
         trace!("factor: i={}", i);
         let (i, _) = multispace0(i)?;
-        let (i, f) = alt((identifier, numeric, string, parens_expr))(i)?;
-        Ok((i, f))
+        alt((identifier, numeric, string, parens_expr))(i)
     }
 
     // FIXME: this one sucks particularly HARD
     fn string(i: Input) -> IResult<Input, Box<Node>> {
         trace!("string: i={}", i);
-        let (i, s) = delimited(
-            tag("\""),
-            recognize(move |i| {
-                let mut i = i;
-                loop {
-                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
-                        escaped_char,
-                        take_till1(|x| x == '\\' || x == '"'),
-                    ))(i)
-                    {
-                        i = r;
-                    } else {
-                        break;
+        map(
+            delimited(
+                tag("\""),
+                recognize(move |i| {
+                    let mut i = i;
+                    loop {
+                        if let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
+                            escaped_char,
+                            take_till1(|x| x == '\\' || x == '"'),
+                        ))(i)
+                        {
+                            i = r;
+                        } else {
+                            break;
+                        }
                     }
-                }
-                Ok((i, ""))
-            }),
-            tag("\""),
-        )(i)?;
-        Ok((i, Node::from_string(s)))
+                    Ok((i, ""))
+                }),
+                tag("\""),
+            ),
+            Node::from_string,
+        )(i)
     }
 
     fn escaped_char(i: Input) -> IResult<Input, Input> {
@@ -322,38 +323,42 @@ pub mod nom_parser {
         let (i, _) = multispace0(i)?;
         let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
         let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
-        let (i, _) = multispace0(i)?;
         Ok((i, Node::from_identifier(ident)))
     }
 
     fn numeric(i: Input) -> IResult<Input, Box<Node>> {
         trace!("numeric: i={}", i);
         let (i, _) = multispace0(i)?;
-        let (i, num) = alt((hexnum, octnum, binnum, recognize_float))(i)?;
-        Ok((i, Node::from_numeric(num)))
+        map(
+            alt((hexnum, octnum, binnum, recognize_float)),
+            Node::from_numeric,
+        )(i)
     }
 
-    fn prefixed_num<'a>(i: &'a str, pfx: &'_ str, is_digit: impl Fn(u8) -> bool) -> IResult<&'a str, &'a str> {
+    fn prefixed_num<'a>(
+        pfx: &'_ str,
+        is_digit: impl Fn(u8) -> bool,
+        i: &'a str,
+    ) -> IResult<&'a str, &'a str> {
         trace!("prefixed_num: i={}", i);
         let (i, _) = multispace0(i)?;
-        let (i, num) = recognize(|i| {
+        recognize(|i| {
             trace!("recognize_num: i={}", i);
             let (i, _) = tag(pfx)(i)?;
             take_till1(|x| !is_digit(x as u8))(i)
-        })(i)?;
-        Ok((i, num))
+        })(i)
     }
 
     fn hexnum(i: Input) -> IResult<Input, Input> {
-        prefixed_num(i, "0x", is_hex_digit)
+        prefixed_num("0x", is_hex_digit, i)
     }
 
     fn octnum(i: Input) -> IResult<Input, Input> {
-        prefixed_num(i, "0o", is_oct_digit)
+        prefixed_num("0o", is_oct_digit, i)
     }
 
     fn binnum(i: Input) -> IResult<Input, Input> {
-        prefixed_num(i, "0b", |x| x == b'0' || x == b'1')
+        prefixed_num("0b", |x| x == b'0' || x == b'1', i)
     }
 }
 
