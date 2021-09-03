@@ -1,14 +1,19 @@
 use tracing_subscriber::FmtSubscriber;
 use tracing::{Level, info, error as log_err};
-use filterer::{nom_parser};//, pest_parser};
+use filterer::nom_parser;
+
 use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use std::collections::HashMap;
 
-// use pest::Parser;
 use filterer::nom_parser::eval::{Eval, Accessor};
+
+#[cfg(feature = "pest")]
+pub use filterer::pest_parser;
+
+pub use pest::Parser;
 
 #[derive(Debug)]
 struct Message {
@@ -59,11 +64,14 @@ fn doit(l: &str) {
         log_err!("{}", e);
     }
 
-    // if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|_x| {
-    //     //info!("Got: {}", x);
-    // }) {
-    //     log_err!("Got error: {:?}", e);
-    // }
+    #[cfg(feature = "pest")]
+    {
+        if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|_x| {
+            //info!("Got: {}", x);
+        }) {
+            log_err!("Got error: {:?}", e);
+        }
+    }
 }
 
 fn main() -> io::Result<()> {

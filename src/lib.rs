@@ -516,11 +516,12 @@ pub mod nom_parser {
     }
 }
 
-// pub mod pest_parser {
-//     #[derive(pest_derive::Parser, Debug, Clone)]
-//     #[grammar = "filter.pest"]
-//     pub struct Filter;
-// }
+#[cfg(feature = "pest")]
+pub mod pest_parser {
+    #[derive(pest_derive::Parser, Debug, Clone)]
+    #[grammar = "filter.pest"]
+    pub struct Filter;
+}
 
 #[cfg(test)]
 mod tests {
