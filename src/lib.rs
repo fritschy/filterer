@@ -456,13 +456,9 @@ pub mod nom_parser {
                                 },
 
                                 BinaryOp::Eq  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
                                     ret(l == r)
                                 },
                                 BinaryOp::Ne  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
                                     ret(l != r)
                                 },
                                 BinaryOp::Ge  => {
