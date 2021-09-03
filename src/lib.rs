@@ -24,7 +24,6 @@ pub mod nom_parser {
     use tracing::{error as log_err, trace};
 
     use std::fmt;
-    use Node::{Binary, Unary};
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -110,6 +109,21 @@ pub mod nom_parser {
         fn from_string(i: Input) -> Box<Node> {
             Box::new(Node::StringLiteral(i.to_string()))
         }
+
+        fn new_binary(lhs: Box<Node>, op: BinaryOp, rhs: Box<Node>) -> Box<Node> {
+            Box::new(Node::Binary {
+                lhs,
+                op,
+                rhs,
+            })
+        }
+
+        fn new_unary(op: UnaryOp, expr: Box<Node>) -> Box<Node> {
+            Box::new(Node::Unary {
+                op,
+                expr,
+            })
+        }
     }
 
     pub struct ParseError<'a> {
@@ -184,14 +198,7 @@ pub mod nom_parser {
         })(i)?;
 
         if let Some((op, n)) = on {
-            Ok((
-                i,
-                Box::new(Binary {
-                    lhs: ae,
-                    op,
-                    rhs: n,
-                }),
-            ))
+            Ok((i, Node::new_binary(ae, op, n)))
         } else {
             Ok((i, ae))
         }
@@ -241,7 +248,7 @@ pub mod nom_parser {
         let (i, ue) = factor(i)?;
 
         if let Some(op) = op {
-            Ok((i, Box::new(Unary { op, expr: ue })))
+            Ok((i, Node::new_unary(op, ue)))
         } else {
             Ok((i, ue))
         }
