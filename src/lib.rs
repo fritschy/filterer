@@ -531,7 +531,7 @@ mod tests {
 
     type Data<'a> = &'a str;
 
-    const DATA: &[Data<'static>] = &["abc", "cde", "ahi", "10a", "0x100", "0x200", "0o12", "0b101", "\"\\\"moo\\\""];
+    const DATA: &[Data<'static>] = &["abc", "cde", "ahi", "10a", "0x100", "0x200", "0o12", "0b101", "\"\\\"moo\\\"\n\t\\v\r\\f"];
 
     impl<'a> Accessor for Data<'a> {
         fn ident<'b>(&'b self, k: &str) -> Result<&'a str, String> {
@@ -546,26 +546,41 @@ mod tests {
     // Compare expr filter with iter filter
     fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
         let mut re_cache = HashMap::new();
-        let p = parse(expr).expect("parsed");
-        assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m, &mut re_cache)).map(|m| *m).collect::<Vec<&str>>(),
-                   DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
+        if let Err(p) = parse(expr).map(|p| {
+            assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m, &mut re_cache)).map(|m| *m).collect::<Vec<&str>>(),
+                       DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
+        }) {
+            panic!("{}", p);
+        }
     }
 
     #[test]
-    fn simple() {
+    fn always_true() {
         compare("1", |_| true);
         compare("!0", |_| true);
+    }
 
+    #[test]
+    fn always_false() {
         compare("0", |_| false);
         compare("!1", |_| false);
         compare("0b0 || -0o0 || does_not_exist", |_| false);
+    }
 
+    #[test]
+    fn regexes() {
         compare("d =~ \"a\"", |x| regex::Regex::new("a").unwrap().is_match(x));
         compare("!(d =~ \"a\")", |x| !regex::Regex::new("a").unwrap().is_match(x));
+    }
 
+    #[test]
+    fn relops() {
         compare("d >= 0x100 && d <= 0x200 && d", |&&x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && x != "0");
         compare("d > 0xff && d < 0x201 && d", |&&x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && x != "0");
+    }
 
+    #[test]
+    fn comparisons() {
         compare("d == \"ahi\"", |&&x| x == "ahi");
         compare("d != \"ahi\"", |&&x| x != "ahi");
     }
@@ -578,5 +593,6 @@ mod tests {
         println!("{}", parse("(").unwrap_err().describe());
         println!("{}", parse(")").unwrap_err().describe());
         println!("{}", parse("\"").unwrap_err().describe());
+        println!("{}", parse("flags && flags &= 0").unwrap_err().describe());
     }
 }
