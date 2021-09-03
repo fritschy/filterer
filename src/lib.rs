@@ -24,6 +24,7 @@ pub mod nom_parser {
     use tracing::{error as log_err, trace};
 
     use std::fmt;
+    use std::num::ParseIntError;
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -97,13 +98,29 @@ pub mod nom_parser {
         }
     }
 
+    fn parse_num(i: &str) -> Result<isize, ParseIntError> {
+        if i.starts_with("0x") {
+            isize::from_str_radix(&i[2..], 16)
+        } else if i.starts_with("0o") {
+            isize::from_str_radix(&i[2..], 8)
+        } else if i.starts_with("0b") {
+            isize::from_str_radix(&i[2..], 2)
+        } else {
+            isize::from_str_radix(i, 10)
+        }
+    }
+
     impl Node {
         fn from_identifier(i: Input) -> Box<Node> {
             Box::new(Node::Identifier(i.to_string()))
         }
 
         fn from_numeric(i: Input) -> Box<Node> {
-            Box::new(Node::Constant(i.to_string()))
+            if let Ok(num) = parse_num(i) {
+                Box::new(Node::Constant(format!("{}", num)))
+            } else {
+                Box::new(Node::Constant("0".into()))
+            }
         }
 
         fn from_string(i: Input) -> Box<Node> {
