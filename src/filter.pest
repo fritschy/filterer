@@ -11,7 +11,7 @@ factor = { ws* ~ (identifier | numeral | string | parensExpr){1,1} }
 string = { ws* ~ dquote ~ stringChars ~ dquote }
 dquote = { "\"" }
 stringChars = { (quoteChar | ASCII_ALPHANUMERIC | (chars))* }
-chars = { "." | "~" | "*" | "(" | ")" | "{" | "}" | "[" | "]" }
+chars = { "." | "~" | "*" | "(" | ")" | "{" | "}" | "[" | "]" | " " | "_" | "-" | "+" | "/" | "`" | "´" | "$" | "%" | "§" | "@" | ":" | ";" | "#" | "'" | "=" | "!" | "^" | "°" }
 quoteChar = { "\\" ~ ("\"" | "\\" | "n" | "r" | "t" | "f" | "v" | "0" ) }
 parensExpr = _{ "(" ~ ws* ~ simpleExpr ~ ws* ~ ")" }
 identifier = @{ name }
