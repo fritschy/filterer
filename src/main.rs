@@ -9,10 +9,10 @@ use pest::Parser;
 
 fn doit(l: &str) {
     if let Err(e) = nom_parser::parse(l.trim()).and_then(|x| {
-        info!("Got: {}: {:#?}", x.0, x.1.as_ref());
+        info!("Got: {:#?}", x.as_ref());
         Ok(())
     }) {
-        log_err!("Got error: {:?}", e);
+        log_err!("{}", e);
     }
 
     if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).and_then(|x| {

@@ -13,8 +13,6 @@
 // How to implement chaining of logic operators, i.e. EXPR && EXPR?
 
 pub mod nom_parser {
-    use std::fmt::Debug;
-
     use nom::branch::alt;
     use nom::bytes::complete::{tag, take_till1};
     use nom::character::complete::{multispace0, satisfy};
@@ -22,10 +20,11 @@ pub mod nom_parser {
     use nom::combinator::{eof, map, peek, recognize, opt};
     use nom::number::complete::recognize_float;
     use nom::sequence::{delimited, preceded};
-    use nom::{AsChar, IResult};
-    use tracing::trace;
+    use nom::{AsChar, IResult, Finish, Offset};
+    use tracing::{trace, error as log_err};
 
     use Node::{Binary, Unary};
+    use std::fmt;
 
     #[derive(Debug, Clone)]
     pub enum Node {
@@ -68,34 +67,10 @@ pub mod nom_parser {
         Or,  // A || B
     }
 
-    // A pest.rs grammar,
-    // Couple of notes though:
-    // * WITESPACE should ne done explicitly
-    // * string parsing is missin
-    // * octal and binary numerals are missing
-    //
-    // expr = { SOI ~ simpleExpr ~ EOI }
-    // simpleExpr = { andExpr ~ or ~ simpleExpr | andExpr }
-    // andExpr = { relExpr ~ and ~ andExpr | relExpr }
-    // relExpr = { sumExpr ~ relop ~ relExpr | sumExpr }
-    // sumExpr = { unaryExpr ~ sumop ~ sumExpr | unaryExpr }
-    // relop = { "==" | "!=" | ">=" | "<=" | ">" | "<" | "=~" }
-    // sumop = { "&" }
-    // unaryExpr = { unaryOp ~ unaryExpr | factor }
-    // unaryOp = { "!" | "-" }
-    // factor = { identifier | numeral | parensExpr }
-    // parensExpr = { "(" ~ expr ~ ")" }
-    // identifier = @{ name }
-    // nameHead = { ASCII_ALPHA | "_" }
-    // nameTail = { ASCII_ALPHANUMERIC | "_" }
-    // name = { nameHead ~ nameTail* | nameHead+ }
-    // numeral = @{ ("0x" ~ ASCII_HEX_DIGIT+) | ASCII_DIGIT+ }
-    // or = { "||" }
-    // and = { "&&" }
-    // WHITESPACE = _{ " " | "\t" }
+    type Input<'a> = &'a str;
 
-    impl From<&str> for BinaryOp {
-        fn from(i: &str) -> Self {
+    impl<'a> From<Input<'a>> for BinaryOp {
+        fn from(i: Input) -> Self {
             match i {
                 "==" => BinaryOp::Eq,
                 "!=" => BinaryOp::Ne,
@@ -113,8 +88,8 @@ pub mod nom_parser {
         }
     }
 
-    impl From<&str> for UnaryOp {
-        fn from(i: &str) -> Self {
+    impl<'a> From<Input<'a>> for UnaryOp {
+        fn from(i: Input) -> Self {
             match i {
                 "!" => UnaryOp::Not,
                 "-" => UnaryOp::Neg,
@@ -124,35 +99,91 @@ pub mod nom_parser {
     }
 
     impl Node {
-        fn from_identifier(i: &str) -> Box<Node> {
+        fn from_identifier(i: Input) -> Box<Node> {
             Box::new(Node::Identifier(i.to_string()))
         }
 
-        fn from_numeric(i: &str) -> Box<Node> {
+        fn from_numeric(i: Input) -> Box<Node> {
             Box::new(Node::Constant(i.to_string()))
         }
 
-        fn from_string(i: &str) -> Box<Node> {
+        fn from_string(i: Input) -> Box<Node> {
             Box::new(Node::StringLiteral(i.to_string()))
         }
     }
 
-    pub fn parse(i: &str) -> IResult<&str, Box<Node>> {
-        trace!("parse: i={}", i);
+    pub struct ParseError<'a> {
+        pub input: &'a str,
+        pub pos: usize,
+        pub msg: String,
+    }
+
+    impl<'a> ParseError<'a> {
+        fn new(input: &'a str, pos: usize, msg: String) -> Self {
+            Self {
+                input,
+                pos,
+                msg
+            }
+        }
+
+        pub fn describe(&self) -> String {
+            format!("{}", self)
+        }
+    }
+
+    impl<'a> fmt::Display for ParseError<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            writeln!(f, "Parse Error: {}", self.msg)?;
+            writeln!(f, "> {}", self.input)?;
+            writeln!(f, "> {}^", " ".repeat(self.pos))?;
+            writeln!(f, "> {}`--- this is wrong!", " ".repeat(self.pos))
+        }
+    }
+
+    pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
+        match parse_expr(i) {
+            Ok((_, o)) => Ok(o),
+
+            e => {
+                // Do something ...
+                let fe = e.finish();
+                match &fe {
+                    Err(e) => {
+                        let ei = &e.input;
+                        let sei = ei as &str;
+                        let pos = i.as_bytes().offset(sei.as_bytes());
+                        log_err!("Error at position {}: '{}'", pos, i);
+                        return Err(ParseError::new(i, pos, format!("Error at offset {}", pos)));
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+        }
+    }
+
+    pub fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
+        trace!("parse_expr: i={}", i);
         let (i, e) = simple_expr(i)?;
+        let (i, _) = multispace0(i)?;
         let (i, _) = eof(i)?;
         Ok((i, e))
     }
 
-    fn simple_expr(i: &str) -> IResult<&str, Box<Node>> {
-        trace!("simple_expr: i={}", i);
+    // Implement simple_expr, and_expr, rel_expr and sum_expr through this:
+    fn generic_expr<'a>(
+            opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
+            nextp: &impl Fn(Input) -> IResult<Input, Box<Node>>,
+            i: &'a str)
+        -> IResult<&'a str, Box<Node>> {
         let (i, _) = multispace0(i)?;
-        let (i, ae) = and_expr(i)?;
+        let (i, ae) = nextp(i)?;
         let (i, on) = opt(
             move |i| {
                 let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("||"), BinaryOp::from)(i)?;
-                let (i, se) = simple_expr(i)?;
+                let (i, op) = opp(i)?;
+                let (i, se) = generic_expr(opp, nextp, i)?;
                 Ok((i, (op, se)))
             }
         )(i)?;
@@ -164,67 +195,43 @@ pub mod nom_parser {
         }
     }
 
-    fn and_expr(i: &str) -> IResult<&str, Box<Node>> {
+    fn simple_expr<'a>(i: Input<'a>) -> IResult<&'a str, Box<Node>> {
+        trace!("simple_expr: i={}", i);
+        generic_expr(
+            &mut move |i| map(tag("||"), BinaryOp::from)(i),
+            &move |i| and_expr(i),
+            i
+        )
+    }
+
+    fn and_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("and_expr: i={}", i);
-        let (i, _) = multispace0(i)?;
-        let (i, re) = rel_expr(i)?;
-        let (i, on) = opt(
-            move |i| {
-                let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("&&"), BinaryOp::from)(i)?;
-                let (i, ae) = and_expr(i)?;
-                Ok((i, (op, ae)))
-            }
-        )(i)?;
-
-        if let Some((op, n)) = on {
-            Ok((i, Box::new(Binary { lhs: re, op, rhs: n })))
-        } else {
-            Ok((i, re))
-        }
+        generic_expr(
+            &mut move |i| map(tag("&&"), BinaryOp::from)(i),
+            &move |i| rel_expr(i),
+            i
+        )
     }
 
-    fn rel_expr(i: &str) -> IResult<&str, Box<Node>> {
+    fn rel_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("rel_expr: i={}", i);
-        let (i, _) = multispace0(i)?;
-        let (i, se) = sum_expr(i)?;
-        let (i, on) = opt(
-            move |i| {
-                let (i, _) = multispace0(i)?;
-                let (i, op) = map(relop, BinaryOp::from)(i)?;
-                let (i, re) = rel_expr(i)?;
-                Ok((i, (op, re)))
-            }
-        )(i)?;
-
-        if let Some((op, n)) = on {
-            Ok((i, Box::new(Binary { lhs: se, op, rhs: n })))
-        } else {
-            Ok((i, se))
-        }
+        generic_expr(
+            &mut move |i| map(relop, BinaryOp::from)(i),
+            &move |i| sum_expr(i),
+            i
+        )
     }
 
-    fn sum_expr(i: &str) -> IResult<&str, Box<Node>> {
+    fn sum_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("sum_expr: i={}", i);
-        let (i, _) = multispace0(i)?;
-        let (i, ue) = unary_expr(i)?;
-        let (i, on) = opt(
-            move |i| {
-                let (i, _) = multispace0(i)?;
-                let (i, op) = map(tag("&"), BinaryOp::from)(i)?;
-                let (i, se) = sum_expr(i)?;
-                Ok((i, (op, se)))
-            }
-        )(i)?;
-
-        if let Some((op, n)) = on {
-            Ok((i, Box::new(Binary { lhs: ue, op, rhs: n })))
-        } else {
-            Ok((i, ue))
-        }
+        generic_expr(
+            &mut move |i| map(tag("&"), BinaryOp::from)(i),
+            &move |i| unary_expr(i),
+            i
+        )
     }
 
-    fn unary_expr(i: &str) -> IResult<&str, Box<Node>> {
+    fn unary_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("unary_expr: i={}", i);
         let (i, _) = multispace0(i)?;
         let (i, op) = opt(map(alt((tag("!"), tag("-"))), UnaryOp::from))(i)?;
@@ -237,7 +244,7 @@ pub mod nom_parser {
         }
     }
 
-    fn factor(i: &str) -> IResult<&str, Box<Node>> {
+    fn factor(i: Input) -> IResult<Input, Box<Node>> {
         trace!("factor: i={}", i);
         let (i, _) = multispace0(i)?;
         let (i, f) = alt((identifier, numeric, string, parens_expr))(i)?;
@@ -245,14 +252,14 @@ pub mod nom_parser {
     }
 
     // FIXME: this one sucks particularly HARD
-    fn string(i: &str) -> IResult<&str, Box<Node>> {
+    fn string(i: Input) -> IResult<Input, Box<Node>> {
         trace!("string: i={}", i);
         let (i, s) = delimited(
             tag("\""),
             recognize(move |i| {
                 let mut i = i;
                 loop {
-                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<&str>, _>((
+                    if let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
                         escaped_char,
                         take_till1(|x| x == '\\' || x == '"'),
                     ))(i)
@@ -269,7 +276,7 @@ pub mod nom_parser {
         Ok((i, Node::from_string(s)))
     }
 
-    fn escaped_char(i: &str) -> IResult<&str, &str> {
+    fn escaped_char(i: Input) -> IResult<Input, Input> {
         trace!("escaped_char: i={}", i);
         preceded(
             tag("\\"),
@@ -287,13 +294,13 @@ pub mod nom_parser {
         )(i)
     }
 
-    fn parens_expr(i: &str) -> IResult<&str, Box<Node>> {
+    fn parens_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("parens_expr: i={}", i);
         let (i, _) = multispace0(i)?;
         delimited(tag("("), simple_expr, tag(")"))(i)
     }
 
-    fn relop(i: &str) -> IResult<&str, BinaryOp> {
+    fn relop(i: Input) -> IResult<Input, BinaryOp> {
         trace!("relop: i={}", i);
         let (i, _) = multispace0(i)?;
         map(
@@ -310,7 +317,7 @@ pub mod nom_parser {
         )(i)
     }
 
-    fn identifier(i: &str) -> IResult<&str, Box<Node>> {
+    fn identifier(i: Input) -> IResult<Input, Box<Node>> {
         trace!("identifier: i={}", i);
         let (i, _) = multispace0(i)?;
         let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
@@ -319,7 +326,7 @@ pub mod nom_parser {
         Ok((i, Node::from_identifier(ident)))
     }
 
-    fn numeric(i: &str) -> IResult<&str, Box<Node>> {
+    fn numeric(i: Input) -> IResult<Input, Box<Node>> {
         trace!("numeric: i={}", i);
         let (i, _) = multispace0(i)?;
         let (i, num) = alt((hexnum, octnum, binnum, recognize_float))(i)?;
@@ -337,15 +344,15 @@ pub mod nom_parser {
         Ok((i, num))
     }
 
-    fn hexnum(i: &str) -> IResult<&str, &str> {
+    fn hexnum(i: Input) -> IResult<Input, Input> {
         prefixed_num(i, "0x", is_hex_digit)
     }
 
-    fn octnum(i: &str) -> IResult<&str, &str> {
+    fn octnum(i: Input) -> IResult<Input, Input> {
         prefixed_num(i, "0o", is_oct_digit)
     }
 
-    fn binnum(i: &str) -> IResult<&str, &str> {
+    fn binnum(i: Input) -> IResult<Input, Input> {
         prefixed_num(i, "0b", |x| x == b'0' || x == b'1')
     }
 }
