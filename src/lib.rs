@@ -127,13 +127,13 @@ pub mod nom_parser {
     }
 
     pub struct ParseError<'a> {
-        pub input: &'a str,
+        pub input: Input<'a>,
         pub pos: usize,
         pub msg: String,
     }
 
     impl<'a> ParseError<'a> {
-        fn new(input: &'a str, pos: usize, msg: String) -> Self {
+        fn new(input: Input<'a>, pos: usize, msg: String) -> Self {
             Self { input, pos, msg }
         }
 
