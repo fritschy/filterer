@@ -553,26 +553,21 @@ mod tests {
 
     #[test]
     fn simple() {
-        // match all
         compare("1", |_| true);
         compare("!0", |_| true);
 
-        // match none
         compare("0", |_| false);
         compare("!1", |_| false);
         compare("0b0 || -0o0 || does_not_exist", |_| false);
 
-        // simple re
         compare("d =~ \"a\"", |x| regex::Regex::new("a").unwrap().is_match(x));
         compare("!(d =~ \"a\")", |x| !regex::Regex::new("a").unwrap().is_match(x));
 
-        // Some number relops
-        compare("d >= 0x100 && d <= 0x200 && d", |x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && **x != "0");
-        compare("d > 0xff && d < 0x201 && d", |x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && **x != "0");
+        compare("d >= 0x100 && d <= 0x200 && d", |&&x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && x != "0");
+        compare("d > 0xff && d < 0x201 && d", |&&x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && x != "0");
 
-        // str compare
-        compare("d == \"ahi\"", |x| **x == "ahi");
-        compare("d != \"ahi\"", |x| **x != "ahi");
+        compare("d == \"ahi\"", |&&x| x == "ahi");
+        compare("d != \"ahi\"", |&&x| x != "ahi");
     }
 
     #[test]
