@@ -197,7 +197,7 @@ pub mod nom_parser {
         }
     }
 
-    fn simple_expr<'a>(i: Input<'a>) -> IResult<&'a str, Box<Node>> {
+    fn simple_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("simple_expr: i={}", i);
         generic_expr(
             &mut move |i| map(tag("||"), BinaryOp::from)(i),
@@ -262,16 +262,12 @@ pub mod nom_parser {
                 tag("\""),
                 recognize(move |i| {
                     let mut i = i;
-                    loop {
-                        if let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
+                    while let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
                             escaped_char,
                             take_till1(|x| x == '\\' || x == '"'),
                         ))(i)
-                        {
-                            i = r;
-                        } else {
-                            break;
-                        }
+                    {
+                        i = r;
                     }
                     Ok((i, ""))
                 }),

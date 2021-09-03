@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
 
-    if std::env::args().nth(1).unwrap_or("".to_string()) == "-i" {
+    if std::env::args().nth(1).unwrap_or_else(|| "".to_string()) == "-i" {
         // `()` can be used when no completer is required
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
