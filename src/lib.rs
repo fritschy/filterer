@@ -158,6 +158,7 @@ pub mod nom_parser {
         }
     }
 
+    // parse_expr = { SOI ~ simple_expr ~ ws* ~ EOI }
     pub fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("parse_expr: i={}", i);
         let (i, e) = simple_expr(i)?;
@@ -166,7 +167,7 @@ pub mod nom_parser {
         Ok((i, e))
     }
 
-    // Implement simple_expr, and_expr, rel_expr and sum_expr through this:
+    // generic_expr = { ws* ~ nextp ~ (ws* ~ opp ~ generic_expr ~ ws*)? }
     fn generic_expr<'a>(
         opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
         nextp: &impl Fn(Input) -> IResult<Input, Box<Node>>,
@@ -178,6 +179,7 @@ pub mod nom_parser {
             let (i, _) = multispace0(i)?;
             let (i, op) = opp(i)?;
             let (i, se) = generic_expr(opp, nextp, i)?;
+            let (i, _) = multispace0(i)?;
             Ok((i, (op, se)))
         })(i)?;
 
@@ -231,6 +233,7 @@ pub mod nom_parser {
         )
     }
 
+    // unary_expr = { ws* ~ ("!" | "-")? ~ factor }
     fn unary_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("unary_expr: i={}", i);
         let (i, _) = multispace0(i)?;
@@ -244,6 +247,7 @@ pub mod nom_parser {
         }
     }
 
+    // factor = { ws* ~ (identifier | numeric | string | parens_expr) }
     fn factor(i: Input) -> IResult<Input, Box<Node>> {
         trace!("factor: i={}", i);
         let (i, _) = multispace0(i)?;
@@ -277,6 +281,7 @@ pub mod nom_parser {
         )(i)
     }
 
+    // escaped_char = { "\\" ~ ("\"" | "\\" | "n" | "r" ...) }
     fn escaped_char(i: Input) -> IResult<Input, Input> {
         trace!("escaped_char: i={}", i);
         preceded(
@@ -295,6 +300,7 @@ pub mod nom_parser {
         )(i)
     }
 
+    // parens_expr = { ws* ~ "(" ~ simple_expr ~ ")" }
     fn parens_expr(i: Input) -> IResult<Input, Box<Node>> {
         trace!("parens_expr: i={}", i);
         let (i, _) = multispace0(i)?;
