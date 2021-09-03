@@ -88,7 +88,11 @@ impl Eval<Message> for Box<Node> {
                             ret(l <  r)
                         },
                         BinaryOp::Match => {
-                            ret(l == r)
+                            if let Ok(re) = regex::Regex::new(&r) {
+                                ret(re.is_match(&l))
+                            } else {
+                                ret(l == r)
+                            }
                         },
 
                         BinaryOp::Band => {
