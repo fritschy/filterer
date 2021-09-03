@@ -143,6 +143,7 @@ pub mod nom_parser {
         }
     }
 
+    #[derive(Debug)]
     pub struct ParseError<'a> {
         pub input: Input<'a>,
         pub pos: usize,
