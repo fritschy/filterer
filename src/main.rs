@@ -117,7 +117,7 @@ impl Eval<Message> for Box<Node> {
                     }
                 }
 
-                _ => value(node, e).unwrap_or_else(|| "moo".into()),
+                _ => value(node, e).unwrap_or_else(|| "0".into()),
             }
         }
 
