@@ -27,6 +27,7 @@ trait Eval<T> {
     fn filter(&self, e: &T) -> bool;
 }
 
+// FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<Message> for Box<Node> {
     fn filter(&self, e: &Message) -> bool {
         fn value(node: &Box<Node>, e: &Message) -> Option<String> {
@@ -38,6 +39,7 @@ impl Eval<Message> for Box<Node> {
                         // info!("identifier: x={}", x);
                         let num = parse_num(x);
                         let snum = format!("{}", x);
+                        // Is this a number?
                         if num != 0 && snum != "0" {
                             snum
                         } else {
