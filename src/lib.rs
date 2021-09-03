@@ -423,14 +423,13 @@ pub mod nom_parser {
                         Node::Constant(s) => Some(s.clone()),
                         Node::Identifier(s) => {
                             e.ident(s).ok().map(|x| {
-                                // info!("identifier: x={}", x);
                                 let num = parse_num(x);
-                                let snum = x.to_string();
+                                let snum = num.to_string();
                                 // Is this a number?
                                 if num != 0 && snum != "0" {
                                     snum
                                 } else {
-                                    x.into()
+                                    x.to_string()
                                 }
                             })
                         },

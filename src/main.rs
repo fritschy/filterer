@@ -109,8 +109,11 @@ fn main() -> io::Result<()> {
         }
         rl.save_history("history.txt").unwrap();
     } else {
-        doit("flags == 0x300");
-        //doit("flags & 0x100 != 0b0 && ts <= 0o10101");
+        doit("flags == 0x300 || ts < 200");
+        info!("{}", "-".repeat(41));
+        doit("flags & 0x100 != 0b0 && ts <= 0o10101");
+        info!("{}", "-".repeat(41));
+        doit("(((((((((((((((1)))))))))))))))");
     }
 
     Ok(())
