@@ -80,7 +80,7 @@ pub mod nom_parser {
                 "<" => BinaryOp::Lt,
                 "=~" => BinaryOp::Match,
                 "&" => BinaryOp::Band,
-                "|" => BinaryOp::Bor,
+                "|" => unreachable!(),
                 "&&" => BinaryOp::And,
                 "||" => BinaryOp::Or,
                 _ => unreachable!("Unknown operator {}", i),
@@ -117,9 +117,9 @@ pub mod nom_parser {
 
         fn from_numeric(i: Input) -> Box<Node> {
             if let Ok(num) = parse_num(i) {
-                Box::new(Node::Constant(format!("{}", num)))
+                Box::new(Node::Constant(num.to_string()))
             } else {
-                Box::new(Node::Constant("0".into()))
+                Box::new(Node::Constant("0".to_string()))
             }
         }
 
@@ -557,13 +557,24 @@ mod tests {
     #[test]
     fn always_true() {
         compare("1", |_| true);
+        compare("42", |_| true);
         compare("!0", |_| true);
+        compare("-1 < 0", |_| true);
+        compare("0 > -1", |_| true);
+        compare("0 == -0", |_| true);
+        compare("0xfff & 0x070 == 0x070", |_| true);
+        compare("0xf3f & 0x070 == 0x030", |_| true);
     }
 
     #[test]
     fn always_false() {
         compare("0", |_| false);
         compare("!1", |_| false);
+        compare("-1 > 0", |_| false);
+        compare("-1 >= 0", |_| false);
+        compare("0 < -1", |_| false);
+        compare("0 <= -1", |_| false);
+        compare("!16180", |_| false);
         compare("0b0 || -0o0 || does_not_exist", |_| false);
     }
 
@@ -582,7 +593,9 @@ mod tests {
     #[test]
     fn comparisons() {
         compare("d == \"ahi\"", |&&x| x == "ahi");
+        compare("!(d != \"ahi\")", |&&x| x == "ahi");
         compare("d != \"ahi\"", |&&x| x != "ahi");
+        compare("!(d == \"ahi\")", |&&x| x != "ahi");
     }
 
     #[test]
