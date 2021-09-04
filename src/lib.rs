@@ -150,6 +150,18 @@ pub mod nom_parser {
                 expr,
             })
         }
+
+        fn name(&self) -> &'static str {
+            match self {
+                Node::Regexp(_) => "regex",
+                Node::Identifier(_) => "ident",
+                Node::StringLiteral(_) => "string",
+                Node::Constant(_) => "constant",
+                Node::Unary {op: _, expr: _} => "unary",
+                Node::Binary {lhs: _, op: _, rhs: _} => "binary",
+                _ => unreachable!(),
+            }
+        }
     }
 
     #[derive(Debug)]
@@ -180,7 +192,12 @@ pub mod nom_parser {
 
     pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
         match parse_expr(i) {
-            Ok((_, o)) => Ok(o),
+            Ok((_, o)) => {
+                if let Err(serr) = sema::check(&o) {
+                    return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr.diag)));
+                }
+                Ok(o)
+            }
 
             e => {
                 // Do something ...
@@ -262,6 +279,15 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(tag("&"), BinaryOp::from)(i),
             &move |i| unary_expr(i),
+            i,
+        )
+    }
+
+    fn match_expr(i: Input) -> IResult<Input, Box<Node>> {
+        trace!("match_expr: i={}", i);
+        generic_expr(
+            &mut move |i| map(tag("=~"), BinaryOp::from)(i),
+            &move |i| string("/", &Node::from_regexp)(i),
             i,
         )
     }
@@ -405,10 +431,61 @@ pub mod nom_parser {
         prefixed_num("0b", |x| x == b'0' || x == b'1', i)
     }
 
+    pub mod sema {
+        use super::Node;
 
+        use crate::nom_parser::{
+            BinaryOp,
+            UnaryOp,
+        };
+        use std::any::{Any, TypeId};
 
+        pub struct Error {
+            pub diag: String,
+        }
+
+        pub fn check(node: &Node) -> Result<(), Error> {
+            fn walk(node: &Node) -> Result<(), Error> {
+                match node {
+                    Node::Binary {lhs, op, rhs} => {
+                        match op {
+                            BinaryOp::Match => {
+                                if rhs.name() != "regex" {
+                                    return Err(Error {diag: "Match operator needs a right regex argument".to_string()});
+                                }
+                                if lhs.name() != "ident" && lhs.name() != "string" {
+                                    return Err(Error {diag: "Match operator needs a left string or identifier argument".to_string()});
+                                }
+                            }
+                            _ => {
+                                walk(lhs)?;
+                                walk(rhs)?;
+                            }
+                        }
+                    }
+                    Node::Unary {op, expr} => {
+                        walk(expr)?;
+                    }
+                    Node::Constant(num) => {
+
+                    }
+                    Node::StringLiteral(s) => {
+
+                    }
+                    Node::Identifier(ident) => {
+
+                    }
+                    Node::Regexp(re) => {
+
+                    }
+                }
+                Ok(())
+            }
+
+            walk(node)
         }
     }
+
 }
 
 pub mod eval;

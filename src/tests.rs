@@ -71,12 +71,27 @@ fn comparisons() {
 }
 
 #[test]
-fn errors() {
+fn parse_errors() {
     println!("{}", parse("1+2").unwrap_err().describe());
     println!("{}", parse("d =! \"eins\"").unwrap_err().describe());
     println!("{}", parse("d !& \"eins\"").unwrap_err().describe());
     println!("{}", parse("(").unwrap_err().describe());
     println!("{}", parse(")").unwrap_err().describe());
     println!("{}", parse("\"").unwrap_err().describe());
-    println!("{}", parse("flags && flags &= 0").unwrap_err().describe());
+    println!("{}", parse("flags && flags &").unwrap_err().describe());
+    println!("{}", parse("flags & 0x700 <= 0x300 || (ts >= 1000 && ts < 100000f)").unwrap_err().describe());
+    println!("{}", parse("flags & 0x700 <= 0x300 || ts >= 1000 && ts < 100000)").unwrap_err().describe());
+}
+
+#[test]
+fn semantic_errors() {
+    // rhs needs to be regex
+    println!("{}", parse("1 && app =~ \"moo\"").unwrap_err().describe());
+    println!("{}", parse("app =~ (flags)").unwrap_err().describe());
+    println!("{}", parse("app =~ flags").unwrap_err().describe());
+    println!("{}", parse("\"moo\" =~ \"moo\"").unwrap_err().describe());
+
+    // lhs needs to be ident or string
+    println!("{}", parse("(app =~ /map/) =~ /moo/").unwrap_err().describe());
+    println!("{}", parse("0x100 =~ /moo/").unwrap_err().describe());
 }
