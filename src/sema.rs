@@ -26,19 +26,19 @@ pub fn check(node: &Node) -> Result<(), Error> {
                     }
                 }
             }
-            Node::Unary {op, expr} => {
+            Node::Unary {op: _, expr} => {
                 walk(expr)?;
             }
-            Node::Constant(num) => {
+            Node::Constant(_num) => {
 
             }
-            Node::StringLiteral(s) => {
+            Node::StringLiteral(_s) => {
 
             }
-            Node::Identifier(ident) => {
+            Node::Identifier(_ident) => {
 
             }
-            Node::Regexp(re) => {
+            Node::Regexp(_re) => {
 
             }
         }

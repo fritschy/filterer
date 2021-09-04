@@ -159,7 +159,6 @@ pub mod nom_parser {
                 Node::Constant(_) => "constant",
                 Node::Unary {op: _, expr: _} => "unary",
                 Node::Binary {lhs: _, op: _, rhs: _} => "binary",
-                _ => unreachable!(),
             }
         }
     }
@@ -279,15 +278,6 @@ pub mod nom_parser {
         generic_expr(
             &mut move |i| map(tag("&"), BinaryOp::from)(i),
             &move |i| unary_expr(i),
-            i,
-        )
-    }
-
-    fn match_expr(i: Input) -> IResult<Input, Box<Node>> {
-        trace!("match_expr: i={}", i);
-        generic_expr(
-            &mut move |i| map(tag("=~"), BinaryOp::from)(i),
-            &move |i| string("/", &Node::from_regexp)(i),
             i,
         )
     }
