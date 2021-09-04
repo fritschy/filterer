@@ -151,7 +151,7 @@ pub mod nom_parser {
             })
         }
 
-        fn name(&self) -> &'static str {
+        pub(crate) fn name(&self) -> &'static str {
             match self {
                 Node::Regexp(_) => "regex",
                 Node::Identifier(_) => "ident",
@@ -193,7 +193,7 @@ pub mod nom_parser {
     pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
         match parse_expr(i) {
             Ok((_, o)) => {
-                if let Err(serr) = sema::check(&o) {
+                if let Err(serr) = crate::sema::check(&o) {
                     return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr.diag)));
                 }
                 Ok(o)
@@ -430,63 +430,9 @@ pub mod nom_parser {
     fn binnum(i: Input) -> IResult<Input, Input> {
         prefixed_num("0b", |x| x == b'0' || x == b'1', i)
     }
-
-    pub mod sema {
-        use super::Node;
-
-        use crate::nom_parser::{
-            BinaryOp,
-            UnaryOp,
-        };
-        use std::any::{Any, TypeId};
-
-        pub struct Error {
-            pub diag: String,
-        }
-
-        pub fn check(node: &Node) -> Result<(), Error> {
-            fn walk(node: &Node) -> Result<(), Error> {
-                match node {
-                    Node::Binary {lhs, op, rhs} => {
-                        match op {
-                            BinaryOp::Match => {
-                                if rhs.name() != "regex" {
-                                    return Err(Error {diag: "Match operator needs a right regex argument".to_string()});
-                                }
-                                if lhs.name() != "ident" && lhs.name() != "string" {
-                                    return Err(Error {diag: "Match operator needs a left string or identifier argument".to_string()});
-                                }
-                            }
-                            _ => {
-                                walk(lhs)?;
-                                walk(rhs)?;
-                            }
-                        }
-                    }
-                    Node::Unary {op, expr} => {
-                        walk(expr)?;
-                    }
-                    Node::Constant(num) => {
-
-                    }
-                    Node::StringLiteral(s) => {
-
-                    }
-                    Node::Identifier(ident) => {
-
-                    }
-                    Node::Regexp(re) => {
-
-                    }
-                }
-                Ok(())
-            }
-
-            walk(node)
-        }
-    }
-
 }
+
+mod sema;
 
 pub mod eval;
 
