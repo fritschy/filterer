@@ -184,8 +184,12 @@ pub mod nom_parser {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             writeln!(f, "Parse Error: {}", self.msg)?;
             writeln!(f, "> {}", self.input)?;
-            writeln!(f, "> {}^", " ".repeat(self.pos))?;
-            writeln!(f, "> {}`--- this is wrong!", " ".repeat(self.pos))
+            if self.pos != 0 {
+                writeln!(f, "> {}^", " ".repeat(self.pos))?;
+                writeln!(f, "> {}`--- this is wrong!", " ".repeat(self.pos))
+            } else {
+                writeln!(f, "> {}", "-".repeat(self.input.len()))
+            }
         }
     }
 
