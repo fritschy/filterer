@@ -51,9 +51,8 @@ fn doit(l: &str) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
         info!("Got: {:#?}", x.as_ref());
         let mut count = 0;
-        let mut re_cache = HashMap::new();
         for m in messages().iter() {
-            if x.eval_filter(m, &mut re_cache) {
+            if x.eval_filter(m) {
                 count += 1;
                 info!("{:?}", m);
             }

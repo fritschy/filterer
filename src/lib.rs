@@ -40,6 +40,7 @@ pub mod nom_parser {
         Identifier(String),
         Constant(String),
         StringLiteral(String),
+        Regexp(regex::Regex),
     }
 
     #[derive(Debug, Clone)]
@@ -125,6 +126,14 @@ pub mod nom_parser {
 
         fn from_string(i: Input) -> Box<Node> {
             Box::new(Node::StringLiteral(i.to_string()))
+        }
+
+        fn from_regexp(i: Input) -> Box<Node> {
+            if let Ok(re) = regex::Regex::new(i) {
+                Box::new(Node::Regexp(re))
+            } else {
+                Box::new(Node::Regexp(regex::Regex::new("").unwrap()))
+            }
         }
 
         fn new_binary(lhs: Box<Node>, op: BinaryOp, rhs: Box<Node>) -> Box<Node> {
@@ -275,49 +284,58 @@ pub mod nom_parser {
     fn factor(i: Input) -> IResult<Input, Box<Node>> {
         trace!("factor: i={}", i);
         let (i, _) = multispace0(i)?;
-        alt((identifier, numeric, string, parens_expr))(i)
+        alt((
+            identifier,
+            numeric,
+            string("\"", &Node::from_string),
+            string("/", &Node::from_regexp),
+            parens_expr
+        ))(i)
     }
 
     // FIXME: this one sucks particularly HARD
-    fn string(i: Input) -> IResult<Input, Box<Node>> {
-        trace!("string: i={}", i);
-        map(
-            delimited(
-                tag("\""),
-                recognize(move |i| {
-                    let mut i = i;
-                    while let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
-                            escaped_char,
-                            take_till1(|x| x == '\\' || x == '"'),
+    fn string<'a>(delimiter: Input<'a>, map_to: &'a impl Fn(Input) -> Box<Node>) -> impl Fn(Input) -> IResult<Input, Box<Node>> + 'a {
+        move |i| {
+            trace!("string: i={}", i);
+            map(
+                delimited(
+                    tag(delimiter),
+                    recognize(move |i| {
+                        let mut i = i;
+                        while let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
+                            escaped_char(delimiter),
+                            take_till1(|x| x == '\\' || x as u8 == delimiter.as_bytes()[0]),
                         ))(i)
-                    {
-                        i = r;
-                    }
-                    Ok((i, ""))
-                }),
-                tag("\""),
-            ),
-            Node::from_string,
-        )(i)
+                        {
+                            i = r;
+                        }
+                        Ok((i, ""))
+                    }),
+                    tag(delimiter),
+                ),
+                map_to,
+            )(i)
+        }
     }
 
     // escaped_char = { "\\" ~ ("\"" | "\\" | "n" | "r" ...) }
-    fn escaped_char(i: Input) -> IResult<Input, Input> {
-        trace!("escaped_char: i={}", i);
-        preceded(
-            tag("\\"),
-            alt((
-                tag("\""),
+    fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '_ {
+        move |i| {
+            trace!("escaped_char: i={}", i);
+            preceded(
                 tag("\\"),
-                tag("n"),
-                tag("r"),
-                tag("0"),
-                tag("f"),
-                tag("b"),
-                tag("t"),
-                tag("v"),
-            )),
-        )(i)
+                alt((
+                    tag(delimiter),
+                    tag("n"),
+                    tag("r"),
+                    tag("0"),
+                    tag("f"),
+                    tag("b"),
+                    tag("t"),
+                    tag("v"),
+                )),
+            )(i)
+        }
     }
 
     // parens_expr = { ws* ~ "(" ~ simple_expr ~ ")" }
@@ -403,12 +421,12 @@ pub mod nom_parser {
         }
 
         pub trait Eval<T> {
-            fn eval_filter(&self, e: T, re_cache: &mut HashMap<String, Regex>) -> bool;
+            fn eval_filter(&self, e: T) -> bool;
         }
 
         // FIXME: this is quickest and most inefficient way I could possibly imagine!
         impl Eval<&dyn Accessor> for Box<Node> {
-            fn eval_filter(&self, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> bool {
+            fn eval_filter(&self, e: &dyn Accessor) -> bool {
                 fn value(node: &Node, e: &dyn Accessor) -> Option<String> {
                     match node {
                         Node::StringLiteral(s) => Some(s.clone()),
@@ -433,11 +451,11 @@ pub mod nom_parser {
                     if v { "1".into() } else { "0".into() }
                 }
 
-                fn eval(node: &Node, e: &dyn Accessor, re_cache: &mut HashMap<String, Regex>) -> String {
+                fn eval(node: &Node, e: &dyn Accessor) -> String {
                     match node {
                         Node::Binary { rhs, op, lhs } => {
-                            let l = eval(lhs, e, re_cache);
-                            let r = eval(rhs, e, re_cache);
+                            let l = eval(lhs, e);
+                            let r = eval(rhs, e);
 
                             match op {
                                 BinaryOp::And => {
@@ -474,14 +492,7 @@ pub mod nom_parser {
                                     ret(l <  r)
                                 },
                                 BinaryOp::Match => {
-                                    let re = re_cache.entry(r.clone());
-                                    let re = re.or_insert_with(move || {
-                                        if let Ok(re) = regex::Regex::new(&r) {
-                                            re
-                                        } else {
-                                            panic!("Invalid regular expression");
-                                        }
-                                    });
+                                    let re = match &**rhs {Node::Regexp(re) => re, _ => panic!("Not a regex"), };
                                     ret(re.is_match(&l))
                                 },
 
@@ -498,10 +509,10 @@ pub mod nom_parser {
                         Node::Unary { op, expr } => {
                             match op {
                                 UnaryOp::Not => {
-                                    ret(eval(expr, e, re_cache) == "0")
+                                    ret(eval(expr, e) == "0")
                                 }
                                 UnaryOp::Neg => {
-                                    (-parse_num(&eval(expr, e, re_cache))).to_string()
+                                    (-parse_num(&eval(expr, e))).to_string()
                                 }
                             }
                         }
@@ -510,7 +521,7 @@ pub mod nom_parser {
                     }
                 }
 
-                eval(self, e, re_cache) != "0"
+                eval(self, e) != "0"
             }
         }
     }
@@ -545,9 +556,8 @@ mod tests {
 
     // Compare expr filter with iter filter
     fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
-        let mut re_cache = HashMap::new();
         if let Err(p) = parse(expr).map(|p| {
-            assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m, &mut re_cache)).map(|m| *m).collect::<Vec<&str>>(),
+            assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m)).map(|m| *m).collect::<Vec<&str>>(),
                        DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
         }) {
             panic!("{}", p);
@@ -580,8 +590,9 @@ mod tests {
 
     #[test]
     fn regexes() {
-        compare("d =~ \"a\"", |x| regex::Regex::new("a").unwrap().is_match(x));
-        compare("!(d =~ \"a\")", |x| !regex::Regex::new("a").unwrap().is_match(x));
+        compare("d =~ /a/", |x| regex::Regex::new("a").unwrap().is_match(x));
+        compare("!(d =~ /a/)", |x| !regex::Regex::new("a").unwrap().is_match(x));
+        // compare("\"a\" =~ d", |x| regex::Regex::new("a").unwrap().is_match(x));
     }
 
     #[test]
