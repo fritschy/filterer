@@ -99,7 +99,7 @@ pub mod nom_parser {
         }
     }
 
-    fn parse_num(i: &str) -> Result<isize, ParseIntError> {
+    pub(crate) fn parse_num(i: &str) -> Result<isize, ParseIntError> {
         if let Some(i) = i.strip_prefix("0x") {
             isize::from_str_radix(i, 16)
         } else if let Some(i) = i.strip_prefix("0o") {
@@ -405,218 +405,20 @@ pub mod nom_parser {
         prefixed_num("0b", |x| x == b'0' || x == b'1', i)
     }
 
-    pub mod eval {
-        // quick and hacked implementation of an expression evaluation
 
-        use std::collections::HashMap;
-        use regex::Regex;
-        use super::{Node, BinaryOp, UnaryOp};
 
-        pub fn parse_num(i: &str) -> isize {
-            super::parse_num(i).unwrap_or(0)
-        }
-
-        pub trait Accessor {
-            fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String>;
-        }
-
-        pub trait Eval<T> {
-            fn eval_filter(&self, e: T) -> bool;
-        }
-
-        // FIXME: this is quickest and most inefficient way I could possibly imagine!
-        impl Eval<&dyn Accessor> for Box<Node> {
-            fn eval_filter(&self, e: &dyn Accessor) -> bool {
-                fn value(node: &Node, e: &dyn Accessor) -> Option<String> {
-                    match node {
-                        Node::StringLiteral(s) => Some(s.clone()),
-                        Node::Constant(s) => Some(s.clone()),
-                        Node::Identifier(s) => {
-                            e.ident(s).ok().map(|x| {
-                                let num = parse_num(x);
-                                let snum = num.to_string();
-                                // Is this a number?
-                                if num != 0 && snum != "0" {
-                                    snum
-                                } else {
-                                    x.to_string()
-                                }
-                            })
-                        },
-                        _ => None,
-                    }
-                }
-
-                fn ret(v: bool) -> String {
-                    if v { "1".into() } else { "0".into() }
-                }
-
-                fn eval(node: &Node, e: &dyn Accessor) -> String {
-                    match node {
-                        Node::Binary { rhs, op, lhs } => {
-                            let l = eval(lhs, e);
-                            let r = eval(rhs, e);
-
-                            match op {
-                                BinaryOp::And => {
-                                    ret(l != "0" && r != "0")
-                                },
-                                BinaryOp::Or  => {
-                                    ret(l != "0" || r != "0")
-                                },
-
-                                BinaryOp::Eq  => {
-                                    ret(l == r)
-                                },
-                                BinaryOp::Ne  => {
-                                    ret(l != r)
-                                },
-                                BinaryOp::Ge  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
-                                    ret(l >= r)
-                                },
-                                BinaryOp::Gt  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
-                                    ret(l >  r)
-                                },
-                                BinaryOp::Le  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
-                                    ret(l <= r)
-                                },
-                                BinaryOp::Lt  => {
-                                    let l = parse_num(&l);
-                                    let r = parse_num(&r);
-                                    ret(l <  r)
-                                },
-                                BinaryOp::Match => {
-                                    let re = match &**rhs {Node::Regexp(re) => re, _ => panic!("Not a regex"), };
-                                    ret(re.is_match(&l))
-                                },
-
-                                BinaryOp::Band => {
-                                    let le = parse_num(&l) as usize;
-                                    let re = parse_num(&r) as usize;
-                                    let res = format!("{}", le & re);
-                                    res
-                                },
-                                BinaryOp::Bor => unreachable!(),
-                            }
-                        }
-
-                        Node::Unary { op, expr } => {
-                            match op {
-                                UnaryOp::Not => {
-                                    ret(eval(expr, e) == "0")
-                                }
-                                UnaryOp::Neg => {
-                                    (-parse_num(&eval(expr, e))).to_string()
-                                }
-                            }
-                        }
-
-                        _ => value(node, e).unwrap_or_else(|| "0".into()),
-                    }
-                }
-
-                eval(self, e) != "0"
-            }
         }
     }
 }
+
+pub mod eval;
+
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "pest")]
 pub mod pest_parser {
     #[derive(pest_derive::Parser, Debug, Clone)]
     #[grammar = "filter.pest"]
     pub struct Filter;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::nom_parser::*;
-    use eval::*;
-    use std::collections::HashMap;
-
-    type Data<'a> = &'a str;
-
-    const DATA: &[Data<'static>] = &["abc", "cde", "ahi", "10a", "0x100", "0x200", "0o12", "0b101", "\"\\\"moo\\\"\n\t\\v\r\\f"];
-
-    impl<'a> Accessor for Data<'a> {
-        fn ident<'b>(&'b self, k: &str) -> Result<&'a str, String> {
-            if k == "d" {
-                Ok(self)
-            } else {
-                Err("Unknown identifier".to_string())
-            }
-        }
-    }
-
-    // Compare expr filter with iter filter
-    fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
-        if let Err(p) = parse(expr).map(|p| {
-            assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m)).map(|m| *m).collect::<Vec<&str>>(),
-                       DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
-        }) {
-            panic!("{}", p);
-        }
-    }
-
-    #[test]
-    fn always_true() {
-        compare("1", |_| true);
-        compare("42", |_| true);
-        compare("!0", |_| true);
-        compare("-1 < 0", |_| true);
-        compare("0 > -1", |_| true);
-        compare("0 == -0", |_| true);
-        compare("0xfff & 0x070 == 0x070", |_| true);
-        compare("0xf3f & 0x070 == 0x030", |_| true);
-    }
-
-    #[test]
-    fn always_false() {
-        compare("0", |_| false);
-        compare("!1", |_| false);
-        compare("-1 > 0", |_| false);
-        compare("-1 >= 0", |_| false);
-        compare("0 < -1", |_| false);
-        compare("0 <= -1", |_| false);
-        compare("!16180", |_| false);
-        compare("0b0 || -0o0 || does_not_exist", |_| false);
-    }
-
-    #[test]
-    fn regexes() {
-        compare("d =~ /a/", |x| regex::Regex::new("a").unwrap().is_match(x));
-        compare("!(d =~ /a/)", |x| !regex::Regex::new("a").unwrap().is_match(x));
-        // compare("\"a\" =~ d", |x| regex::Regex::new("a").unwrap().is_match(x));
-    }
-
-    #[test]
-    fn relops() {
-        compare("d >= 0x100 && d <= 0x200 && d", |&&x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && x != "0");
-        compare("d > 0xff && d < 0x201 && d", |&&x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && x != "0");
-    }
-
-    #[test]
-    fn comparisons() {
-        compare("d == \"ahi\"", |&&x| x == "ahi");
-        compare("!(d != \"ahi\")", |&&x| x == "ahi");
-        compare("d != \"ahi\"", |&&x| x != "ahi");
-        compare("!(d == \"ahi\")", |&&x| x != "ahi");
-    }
-
-    #[test]
-    fn errors() {
-        println!("{}", parse("1+2").unwrap_err().describe());
-        println!("{}", parse("d =! \"eins\"").unwrap_err().describe());
-        println!("{}", parse("d !& \"eins\"").unwrap_err().describe());
-        println!("{}", parse("(").unwrap_err().describe());
-        println!("{}", parse(")").unwrap_err().describe());
-        println!("{}", parse("\"").unwrap_err().describe());
-        println!("{}", parse("flags && flags &= 0").unwrap_err().describe());
-    }
 }

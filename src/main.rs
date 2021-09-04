@@ -6,9 +6,7 @@ use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-use std::collections::HashMap;
-
-use filterer::nom_parser::eval::{Eval, Accessor};
+use filterer::eval::{Eval, Accessor};
 
 #[cfg(feature = "pest")]
 pub use filterer::pest_parser;
