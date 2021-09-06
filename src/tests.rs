@@ -39,6 +39,8 @@ fn always_true() {
     compare("0 == -0", |_| true);
     compare("0xfff & 0x070 == 0x070", |_| true);
     compare("0xf3f & 0x070 == 0x030", |_| true);
+    compare("1 || 0", |_| true);
+    compare("0 || 1", |_| true);
 }
 
 #[test]
@@ -51,19 +53,21 @@ fn always_false() {
     compare("0 <= -1", |_| false);
     compare("!16180", |_| false);
     compare("0b0 || -0o0 || does_not_exist", |_| false);
+    compare("/1/", |_| false);
+    compare("1 && 0", |_| false);
+    compare("0 && 1", |_| false);
 }
 
 #[test]
 fn regexes() {
     compare("d =~ /a/", |x| regex::Regex::new("a").unwrap().is_match(x));
     compare("!(d =~ /a/)", |x| !regex::Regex::new("a").unwrap().is_match(x));
-    // compare("\"a\" =~ d", |x| regex::Regex::new("a").unwrap().is_match(x));
 }
 
 #[test]
 fn relops() {
-    compare("d >= 0x100 && d <= 0x200 && d", |&&x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && x != "0");
-    compare("d > 0xff && d < 0x201 && d", |&&x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && x != "0");
+    compare("d >= 0x100 && d <= 0x200 && d <= d", |&&x| parse_num(x) >= 0x100 && parse_num(x) <= 0x200 && x != "0");
+    compare("d > 0xff && d < 0x201 && d >= d", |&&x| parse_num(x) >= 0xff && parse_num(x) <= 0x201 && x != "0");
 }
 
 #[test]
@@ -98,6 +102,11 @@ fn semantic_errors() {
     // lhs needs to be ident or string
     println!("{}", parse("(app =~ /map/) =~ /moo/").unwrap_err().describe());
     println!("{}", parse("0x100 =~ /moo/").unwrap_err().describe());
+
+    // regexes where they don't make sense
+    println!("{}", parse("app == /moo/").unwrap_err().describe());
+    println!("{}", parse("/moo/ && 1").unwrap_err().describe());
+    println!("{}", parse("1 || /moo/").unwrap_err().describe());
 }
 
 #[test]
