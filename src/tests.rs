@@ -103,5 +103,5 @@ fn semantic_errors() {
 #[test]
 fn mixing_types() {
     compare("d == 0x1010101", |_| false);
-    compare("\"0x100\" == 0x100", |_| false);
+    compare("\"0x100\" == 0x100", |_| true);
 }

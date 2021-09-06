@@ -28,15 +28,32 @@ impl Eval<&dyn Accessor> for Box<Node> {
 
         impl<'a> PartialEq for Value<'a> {
             fn eq(&self, other: &Self) -> bool {
+                if self.is_re() || other.is_re() {
+                    return false;
+                }
+
+                let b_i = other.is_int();
+                let b_s = other.is_str();
+
+                // allow comparison of nums and strings
                 if let Value::Int(a) = self {
-                    if let Value::Int(b) = other {
-                        return a == b;
+                    if b_i {
+                        if let Value::Int(b) = other {
+                            return a == b;
+                        }
+                    } else if b_s {
+                        return *a == parse_num(other.as_str());
                     }
                 } else if let Value::Str(a) = self {
-                    if let Value::Str(b) = other {
-                        return a == b;
+                    if b_s {
+                        if let Value::Str(b) = other {
+                            return a == b;
+                        }
+                    } else if b_i {
+                        return parse_num(a) == other.as_int();
                     }
                 }
+
                 false
             }
         }
@@ -79,6 +96,30 @@ impl Eval<&dyn Accessor> for Box<Node> {
                 match self {
                     Value::Re(r) => *r,
                     _ => panic!("Not an re"),
+                }
+            }
+
+            fn is_int(&self) -> bool {
+                if let Value::Int(_) = self {
+                    true
+                } else {
+                    false
+                }
+            }
+
+            fn is_str(&self) -> bool {
+                if let Value::Str(_) = self {
+                    true
+                } else {
+                    false
+                }
+            }
+
+            fn is_re(&self) -> bool {
+                if let Value::Re(_) = self {
+                    true
+                } else {
+                    false
                 }
             }
         }
