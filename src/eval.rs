@@ -103,27 +103,15 @@ impl Eval<&dyn Accessor> for Box<Node> {
             }
 
             fn is_int(&self) -> bool {
-                if let Value::Int(_) = self {
-                    true
-                } else {
-                    false
-                }
+                matches!(self, Value::Int(_))
             }
 
             fn is_str(&self) -> bool {
-                if let Value::Str(_) = self {
-                    true
-                } else {
-                    false
-                }
+                matches!(self, Value::Str(_))
             }
 
             fn is_re(&self) -> bool {
-                if let Value::Re(_) = self {
-                    true
-                } else {
-                    false
-                }
+                matches!(self, Value::Re(_))
             }
         }
 
