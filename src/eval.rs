@@ -31,15 +31,13 @@ impl Eval<&dyn Accessor> for Box<Node> {
                 if let Value::Int(a) = self {
                     if let Value::Int(b) = other {
                         return a == b;
-                    } else {
-                        return false;
                     }
                 } else if let Value::Str(a) = self {
                     if let Value::Str(b) = other {
                         return a == b;
                     }
                 }
-                return false;
+                false
             }
         }
 
@@ -47,7 +45,10 @@ impl Eval<&dyn Accessor> for Box<Node> {
             fn as_int(&self) -> isize {
                 match self {
                     Value::Int(x) => *x,
-                    Value::Str(x) => parse_num(*x),
+                    Value::Str(x) => {
+                        tracing::warn!("as_int() from string!");
+                        parse_num(*x)
+                    },
                     _ => panic!("as_int() needs to be a number"),
                 }
             }
@@ -63,8 +64,14 @@ impl Eval<&dyn Accessor> for Box<Node> {
             fn as_str(&self) -> &str {
                 match self {
                     Value::Str(s) => *s,
-                    Value::Int(0) | Value::Re(_) => "0",
-                    Value::Int(_) => "1",
+                    Value::Int(0) | Value::Re(_) => {
+                        tracing::warn!("as_str on int or re");
+                        "0"
+                    }
+                    Value::Int(_) => {
+                        tracing::warn!("as_str on int");
+                        "1"
+                    }
                 }
             }
 

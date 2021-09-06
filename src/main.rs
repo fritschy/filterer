@@ -54,12 +54,14 @@ fn doit(l: &str) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
         info!("Got: {:#?}", x.as_ref());
         let mut count = 0;
-        for m in messages().iter() {
-            if x.eval_filter(m) {
-                count += 1;
-                info!("{:?}", m);
+        //for i in 0..1_000_000 {
+            for m in messages().iter() {
+                if x.eval_filter(m) {
+                    count += 1;
+                    info!("{:?}", m);
+                }
             }
-        }
+        //}
 
         info!("matched {}/{} messages", count, messages().len());
     }) {
