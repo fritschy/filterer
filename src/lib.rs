@@ -38,19 +38,19 @@ pub mod nom_parser {
             rhs: Box<Node>,
         },
         Identifier(String),
-        Constant(String),
+        Constant(isize),
         StringLiteral(String),
         Regexp(regex::Regex),
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub enum UnaryOp {
         Not, // !A
         Neg, // -A
     }
 
     // Do we need this.... now?
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub enum BinaryOp {
         Eq, // A == B
         Ne, // A != B
@@ -118,9 +118,9 @@ pub mod nom_parser {
 
         fn from_numeric(i: Input) -> Box<Node> {
             if let Ok(num) = parse_num(i) {
-                Box::new(Node::Constant(num.to_string()))
+                Box::new(Node::Constant(num))
             } else {
-                Box::new(Node::Constant("0".to_string()))
+                Box::new(Node::Constant(0))
             }
         }
 

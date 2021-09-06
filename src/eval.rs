@@ -1,13 +1,15 @@
 // quick and hacked implementation of an expression evaluation
 
 use crate::nom_parser::{Node, BinaryOp, UnaryOp};
+use regex::Regex;
 
 pub fn parse_num(i: &str) -> isize {
     crate::nom_parser::parse_num(i).unwrap_or(0)
 }
 
 pub trait Accessor {
-    fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String>;
+    fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String>;
+    fn get_num(&self, k: &str) -> Result<isize, String>;
 }
 
 pub trait Eval<T> {
@@ -17,31 +19,84 @@ pub trait Eval<T> {
 // FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<&dyn Accessor> for Box<Node> {
     fn eval_filter(&self, e: &dyn Accessor) -> bool {
-        fn value(node: &Node, e: &dyn Accessor) -> Option<String> {
+        enum Value<'a> {
+            Int(isize),
+            Str(&'a str),
+            Re(&'a Regex),
+        }
+
+        impl<'a> PartialEq for Value<'a> {
+            fn eq(&self, other: &Self) -> bool {
+                if let Value::Int(a) = self {
+                    if let Value::Int(b) = other {
+                        return a == b;
+                    } else {
+                        return false;
+                    }
+                } else if let Value::Str(a) = self {
+                    if let Value::Str(b) = other {
+                        return a == b;
+                    }
+                }
+                return false;
+            }
+        }
+
+        impl<'a> Value<'a> {
+            fn as_int(&self) -> isize {
+                match self {
+                    Value::Int(x) => *x,
+                    Value::Str(x) => parse_num(*x),
+                    _ => panic!("as_int() needs to be a number"),
+                }
+            }
+
+            fn as_bool(&self) -> bool {
+                match self {
+                    Value::Int(x) => *x != 0,
+                    Value::Str(s) => *s != "0",
+                    _ => false,
+                }
+            }
+
+            fn as_str(&self) -> &str {
+                match self {
+                    Value::Str(s) => *s,
+                    Value::Int(0) | Value::Re(_) => "0",
+                    Value::Int(_) => "1",
+                }
+            }
+
+            fn as_re(&self) -> &Regex {
+                match self {
+                    Value::Re(r) => *r,
+                    _ => panic!("Not an re"),
+                }
+            }
+        }
+
+        fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
             match node {
-                Node::StringLiteral(s) => Some(s.clone()),
-                Node::Constant(s) => Some(s.clone()),
+                Node::StringLiteral(s) => Some(Value::Str(s)),
+                Node::Constant(s) => Some(Value::Int(*s)),
                 Node::Identifier(s) => {
-                    e.ident(s).ok().map(|x| {
-                        let num = parse_num(x);
-                        let snum = num.to_string();
-                        // Is this a number?
-                        if num != 0 && snum != "0" {
-                            snum
-                        } else {
-                            x.to_string()
-                        }
-                    })
+                    if let Ok(num) = e.get_num(s) {
+                        Some(Value::Int(num))
+                    } else if let Ok(s) = e.get_str(s) {
+                        Some(Value::Str(s))
+                    } else {
+                        None
+                    }
                 },
                 _ => None,
             }
         }
 
-        fn ret(v: bool) -> String {
-                                if v { "1".into() } else { "0".into() }
-                                                                       }
+        fn ret(v: bool) -> Value<'static> {
+            if v { Value::Int(1) } else { Value::Int(0) }
+        }
 
-        fn eval(node: &Node, e: &dyn Accessor) -> String {
+        fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value<'a> {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     let l = eval(lhs, e);
@@ -49,10 +104,10 @@ impl Eval<&dyn Accessor> for Box<Node> {
 
                     match op {
                         BinaryOp::And => {
-                            ret(l != "0" && r != "0")
+                            ret(l.as_bool() && r.as_bool())
                         },
                         BinaryOp::Or  => {
-                            ret(l != "0" || r != "0")
+                            ret(l.as_bool() || r.as_bool())
                         },
 
                         BinaryOp::Eq  => {
@@ -62,35 +117,23 @@ impl Eval<&dyn Accessor> for Box<Node> {
                             ret(l != r)
                         },
                         BinaryOp::Ge  => {
-                            let l = parse_num(&l);
-                            let r = parse_num(&r);
-                            ret(l >= r)
+                            ret(l.as_int() >= r.as_int())
                         },
                         BinaryOp::Gt  => {
-                            let l = parse_num(&l);
-                            let r = parse_num(&r);
-                            ret(l >  r)
+                            ret(l.as_int() >  r.as_int())
                         },
                         BinaryOp::Le  => {
-                            let l = parse_num(&l);
-                            let r = parse_num(&r);
-                            ret(l <= r)
+                            ret(l.as_int() <= r.as_int())
                         },
                         BinaryOp::Lt  => {
-                            let l = parse_num(&l);
-                            let r = parse_num(&r);
-                            ret(l <  r)
+                            ret(l.as_int() <  r.as_int())
                         },
                         BinaryOp::Match => {
-                            let re = match &**rhs {Node::Regexp(re) => re, _ => panic!("Not a regex"), };
-                            ret(re.is_match(&l))
+                            ret(r.as_re().is_match(l.as_str()))
                         },
 
                         BinaryOp::Band => {
-                            let le = parse_num(&l) as usize;
-                            let re = parse_num(&r) as usize;
-                            let res = format!("{}", le & re);
-                            res
+                            Value::Int(l.as_int() & r.as_int())
                         },
                         BinaryOp::Bor => unreachable!(),
                     }
@@ -98,19 +141,15 @@ impl Eval<&dyn Accessor> for Box<Node> {
 
                 Node::Unary { op, expr } => {
                     match op {
-                        UnaryOp::Not => {
-                            ret(eval(expr, e) == "0")
-                        }
-                        UnaryOp::Neg => {
-                            (-parse_num(&eval(expr, e))).to_string()
-                        }
+                        UnaryOp::Not => { Value::Int(if !eval(expr, e).as_bool() { 1 } else { 0 }) }
+                        UnaryOp::Neg => { Value::Int(-eval(expr, e).as_int()) }
                     }
                 }
 
-                _ => value(node, e).unwrap_or_else(|| "0".into()),
+                _ => value(node, e).unwrap_or(Value::Int(0)),
             }
         }
 
-        eval(self, e) != "0"
+        eval(self, e).as_bool()
     }
 }

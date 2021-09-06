@@ -5,13 +5,17 @@ type Data<'a> = &'a str;
 
 const DATA: &[Data<'static>] = &["abc", "cde", "ahi", "10a", "0x100", "0x200", "0o12", "0b101", "\"\\\"moo\\\"\n\t\\v\r\\f"];
 
-impl<'a> Accessor for Data<'a> {
-    fn ident<'b>(&'b self, k: &str) -> Result<&'a str, String> {
+impl Accessor for Data<'_> {
+    fn get_str<'a>(&'a self, k: &str) -> Result<&str, String> {
         if k == "d" {
             Ok(self)
         } else {
             Err("Unknown identifier".to_string())
         }
+    }
+
+    fn get_num(&self, k: &str) -> Result<isize, String> {
+        Err("No such number".to_string())
     }
 }
 

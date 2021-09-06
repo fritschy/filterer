@@ -13,35 +13,40 @@ pub use filterer::pest_parser;
 
 pub use pest::Parser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Message {
-    ts: String,
-    flags: String,
+    ts: usize,
+    flags: usize,
     ctx: String,
     app: String,
-    level: String,
+    level: usize,
 }
 
 impl Accessor for Message {
-    fn ident<'a>(&'a self, k: &str) -> Result<&'a str, String> {
+    fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String> {
         Ok(match k {
-            "flags"  => &self.flags,
-            "ctx"    => &self.ctx,
-            "app"    => &self.app,
-            "level"  => &self.level,
-            "ts"     => &self.ts,
-            _ => return Err(format!("Unknown identifier: {}", k)),
+            "ctx" => &self.ctx,
+            "app" => &self.app,
+            _ => return Err(format!("No such str {}", k)),
+        })
+    }
+    fn get_num(&self, k: &str) -> Result<isize, String> {
+        Ok(match k {
+            "flags" => self.flags as isize,
+            "ts" => self.ts as isize,
+            "level" => self.level as isize,
+            _ => return Err(format!("No such num {}", k)),
         })
     }
 }
 
 fn messages() -> Vec<Message> {
     vec![
-        Message { ts: "0".into(), flags: "0x300".into(), ctx: "render".into(), app: "HMI2".into(), level: "0".into() },
-        Message { ts: "100".into(), flags: "0x301".into(), ctx: "render".into(), app: "HMI1".into(), level: "0".into() },
-        Message { ts: "101".into(), flags: "0x201".into(), ctx: "menu".into(),   app: "HMI".into(),  level: "3".into() },
-        Message { ts: "200".into(), flags: "0x300".into(), ctx: "map".into(),    app: "MAP".into(),  level: "1".into() },
-        Message { ts: "300".into(), flags: "0x004".into(), ctx: "intersection".into(), app: "SideMAP".into(), level: "1".into() },
+        Message { ts: 0, flags: 0x300, ctx: "render".into(), app: "HMI2".into(), level: 0 },
+        Message { ts: 100, flags: 0x301, ctx: "render".into(), app: "HMI1".into(), level: 0 },
+        Message { ts: 101, flags: 0x201, ctx: "menu".into(),   app: "HMI".into(),  level: 3 },
+        Message { ts: 200, flags: 0x300, ctx: "map".into(),    app: "MAP".into(),  level: 1 },
+        Message { ts: 300, flags: 0x004, ctx: "intersection".into(), app: "SideMAP".into(), level: 1 },
     ]
 }
 
