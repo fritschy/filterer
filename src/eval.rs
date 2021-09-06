@@ -134,45 +134,52 @@ impl Eval<&dyn Accessor> for Box<Node> {
         }
 
         fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value<'a> {
+            tracing::trace!("eval, node={:?}", node);
+
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     let l = eval(lhs, e);
-                    let r = eval(rhs, e);
 
                     match op {
                         BinaryOp::And => {
-                            (l.as_bool() && r.as_bool()).into()
+                            (l.as_bool() && eval(rhs, e).as_bool()).into()
                         },
                         BinaryOp::Or  => {
-                            (l.as_bool() || r.as_bool()).into()
+                            (l.as_bool() || eval(rhs, e).as_bool()).into()
                         },
+                        _ => {
+                            let r = eval(rhs, e);
 
-                        BinaryOp::Eq  => {
-                            (l == r).into()
-                        },
-                        BinaryOp::Ne  => {
-                            (l != r).into()
-                        },
-                        BinaryOp::Ge  => {
-                            (l.as_int() >= r.as_int()).into()
-                        },
-                        BinaryOp::Gt  => {
-                            (l.as_int() >  r.as_int()).into()
-                        },
-                        BinaryOp::Le  => {
-                            (l.as_int() <= r.as_int()).into()
-                        },
-                        BinaryOp::Lt  => {
-                            (l.as_int() <  r.as_int()).into()
-                        },
-                        BinaryOp::Match => {
-                            (r.as_re().is_match(l.as_str())).into()
-                        },
+                            match op {
+                                BinaryOp::Eq => {
+                                    (l == r).into()
+                                },
+                                BinaryOp::Ne => {
+                                    (l != r).into()
+                                },
+                                BinaryOp::Ge => {
+                                    (l.as_int() >= r.as_int()).into()
+                                },
+                                BinaryOp::Gt => {
+                                    (l.as_int() > r.as_int()).into()
+                                },
+                                BinaryOp::Le => {
+                                    (l.as_int() <= r.as_int()).into()
+                                },
+                                BinaryOp::Lt => {
+                                    (l.as_int() < r.as_int()).into()
+                                },
+                                BinaryOp::Match => {
+                                    (r.as_re().is_match(l.as_str())).into()
+                                },
 
-                        BinaryOp::Band => {
-                            Value::Int(l.as_int() & r.as_int())
-                        },
-                        BinaryOp::Bor => unreachable!(),
+                                BinaryOp::Band => {
+                                    Value::Int(l.as_int() & r.as_int())
+                                },
+                                BinaryOp::Bor => unreachable!(),
+                                BinaryOp::Or | BinaryOp::And => unreachable!(),
+                            }
+                        }
                     }
                 }
 
