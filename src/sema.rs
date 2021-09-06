@@ -14,12 +14,18 @@ pub fn check(node: &Node) -> Result<(), String> {
                         }
                     }
                     _ => {
+                        if rhs.get_type() == NodeType::Regexp || lhs.get_type() == NodeType::Regexp {
+                            return Err("Regex not allowed here".to_string());
+                        }
                         walk(lhs)?;
                         walk(rhs)?;
                     }
                 }
             }
             Node::Unary {op: _, expr} => {
+                if expr.get_type() == NodeType::Regexp {
+                    return Err("Regex not allowed here".to_string());
+                }
                 walk(expr)?;
             }
             Node::Constant(_num) => {
