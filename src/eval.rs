@@ -149,10 +149,6 @@ impl Eval<&dyn Accessor> for Box<Node> {
             }
         }
 
-        fn ret(v: bool) -> Value<'static> {
-            if v { Value::Int(1) } else { Value::Int(0) }
-        }
-
         fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value<'a> {
             match node {
                 Node::Binary { rhs, op, lhs } => {

@@ -213,7 +213,7 @@ pub mod nom_parser {
         match parse_expr(i) {
             Ok((_, o)) => {
                 if let Err(serr) = crate::sema::check(&o) {
-                    return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr.diag)));
+                    return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr)));
                 }
                 Ok(o)
             }

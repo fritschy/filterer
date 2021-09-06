@@ -1,20 +1,16 @@
 use crate::nom_parser::{BinaryOp, Node, NodeType};
 
-pub struct Error {
-    pub diag: String,
-}
-
-pub fn check(node: &Node) -> Result<(), Error> {
-    fn walk(node: &Node) -> Result<(), Error> {
+pub fn check(node: &Node) -> Result<(), String> {
+    fn walk(node: &Node) -> Result<(), String> {
         match node {
             Node::Binary {lhs, op, rhs} => {
                 match op {
                     BinaryOp::Match => {
                         if rhs.get_type() != NodeType::Regexp {
-                            return Err(Error {diag: "Match operator needs a right regex argument".to_string()});
+                            return Err("Match operator needs a right regex argument".to_string());
                         }
                         if lhs.get_type() != NodeType::Identifier && lhs.get_type() != NodeType::StringLiteral {
-                            return Err(Error {diag: "Match operator needs a left string or identifier argument".to_string()});
+                            return Err("Match operator needs a left string or identifier argument".to_string());
                         }
                     }
                     _ => {
