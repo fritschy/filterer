@@ -19,6 +19,7 @@ pub trait Eval<T> {
 // FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<&dyn Accessor> for Box<Node> {
     fn eval_filter(&self, e: &dyn Accessor) -> bool {
+        #[derive(Debug)]
         enum Value<'a> {
             Int(isize),
             Str(&'a str),
@@ -88,7 +89,8 @@ impl Eval<&dyn Accessor> for Box<Node> {
                         None
                     }
                 },
-                _ => None,
+                Node::Regexp(re) => Some(Value::Re(re)),
+                _ => unreachable!(),
             }
         }
 
