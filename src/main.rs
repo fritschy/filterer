@@ -14,19 +14,19 @@ pub use filterer::pest_parser;
 pub use pest::Parser;
 
 #[derive(Debug, Clone)]
-struct Message {
+struct Message<'a> {
     ts: usize,
     flags: usize,
-    ctx: String,
-    app: String,
+    ctx: &'a str,
+    app: &'a str,
     level: usize,
 }
 
-impl Accessor for Message {
-    fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String> {
+impl<'a> Accessor for Message<'a> {
+    fn get_str(&self, k: &str) -> Result<&'a str, String> {
         Ok(match k {
-            "ctx" => &self.ctx,
-            "app" => &self.app,
+            "ctx" => self.ctx,
+            "app" => self.app,
             _ => return Err(format!("No such str {}", k)),
         })
     }
@@ -40,13 +40,13 @@ impl Accessor for Message {
     }
 }
 
-fn messages() -> Vec<Message> {
+fn messages() -> Vec<Message<'static>> {
     vec![
-        Message { ts: 0, flags: 0x300, ctx: "render".into(), app: "HMI2".into(), level: 0 },
-        Message { ts: 100, flags: 0x301, ctx: "render".into(), app: "HMI1".into(), level: 0 },
-        Message { ts: 101, flags: 0x201, ctx: "menu".into(),   app: "HMI".into(),  level: 3 },
-        Message { ts: 200, flags: 0x300, ctx: "map".into(),    app: "MAP".into(),  level: 1 },
-        Message { ts: 300, flags: 0x004, ctx: "intersection".into(), app: "SideMAP".into(), level: 1 },
+        Message { ts: 0, flags: 0x300, ctx: "render", app: "HMI2", level: 0 },
+        Message { ts: 100, flags: 0x301, ctx: "render", app: "HMI1", level: 0 },
+        Message { ts: 101, flags: 0x201, ctx: "menu",   app: "HMI",  level: 3 },
+        Message { ts: 200, flags: 0x300, ctx: "map",    app: "MAP",  level: 1 },
+        Message { ts: 300, flags: 0x004, ctx: "intersection", app: "SideMAP", level: 1 },
     ]
 }
 
