@@ -255,9 +255,10 @@ pub mod nom_parser {
             let (i, _) = multispace0(i)?;
             let (i, op) = opp(i)?;
             let (i, se) = generic_expr(opp, nextp, i)?;
-            let (i, _) = multispace0(i)?;
             Ok((i, (op, se)))
         })(i)?;
+
+        let (i, _) = multispace0(i)?;
 
         if let Some((op, n)) = on {
             Ok((i, Node::new_binary(ae, op, n)))
