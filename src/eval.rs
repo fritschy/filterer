@@ -45,17 +45,13 @@ impl Eval<&dyn Accessor> for Box<Node> {
                 // allow comparison of nums and strings
                 if let Value::Int(a) = self {
                     if b_i {
-                        if let Value::Int(b) = other {
-                            return a == b;
-                        }
+                        return *a == other.as_int();
                     } else if b_s {
                         return *a == parse_num(other.as_str());
                     }
                 } else if let Value::Str(a) = self {
                     if b_s {
-                        if let Value::Str(b) = other {
-                            return a == b;
-                        }
+                        return *a == other.as_str();
                     } else if b_i {
                         return parse_num(a) == other.as_int();
                     }

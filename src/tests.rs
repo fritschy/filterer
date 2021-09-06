@@ -14,7 +14,7 @@ impl Accessor for Data<'_> {
         }
     }
 
-    fn get_num(&self, k: &str) -> Result<isize, String> {
+    fn get_num(&self, _k: &str) -> Result<isize, String> {
         Err("No such number".to_string())
     }
 }
