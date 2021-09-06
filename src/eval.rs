@@ -26,6 +26,13 @@ impl Eval<&dyn Accessor> for Box<Node> {
             Re(&'a Regex),
         }
 
+        impl<'a> From<bool> for Value<'a> {
+            fn from(b: bool) -> Self {
+                if b { Self::Int(1) }
+                else { Self::Int(0) }
+            }
+        }
+
         impl<'a> PartialEq for Value<'a> {
             fn eq(&self, other: &Self) -> bool {
                 if self.is_re() || other.is_re() {
@@ -154,32 +161,32 @@ impl Eval<&dyn Accessor> for Box<Node> {
 
                     match op {
                         BinaryOp::And => {
-                            ret(l.as_bool() && r.as_bool())
+                            (l.as_bool() && r.as_bool()).into()
                         },
                         BinaryOp::Or  => {
-                            ret(l.as_bool() || r.as_bool())
+                            (l.as_bool() || r.as_bool()).into()
                         },
 
                         BinaryOp::Eq  => {
-                            ret(l == r)
+                            (l == r).into()
                         },
                         BinaryOp::Ne  => {
-                            ret(l != r)
+                            (l != r).into()
                         },
                         BinaryOp::Ge  => {
-                            ret(l.as_int() >= r.as_int())
+                            (l.as_int() >= r.as_int()).into()
                         },
                         BinaryOp::Gt  => {
-                            ret(l.as_int() >  r.as_int())
+                            (l.as_int() >  r.as_int()).into()
                         },
                         BinaryOp::Le  => {
-                            ret(l.as_int() <= r.as_int())
+                            (l.as_int() <= r.as_int()).into()
                         },
                         BinaryOp::Lt  => {
-                            ret(l.as_int() <  r.as_int())
+                            (l.as_int() <  r.as_int()).into()
                         },
                         BinaryOp::Match => {
-                            ret(r.as_re().is_match(l.as_str()))
+                            (r.as_re().is_match(l.as_str())).into()
                         },
 
                         BinaryOp::Band => {

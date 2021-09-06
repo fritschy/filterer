@@ -43,6 +43,29 @@ pub mod nom_parser {
         Regexp(regex::Regex),
     }
 
+    #[derive(PartialEq, Copy, Clone)]
+    pub enum NodeType {
+        Unary,
+        Binary,
+        Identifier,
+        Constant,
+        StringLiteral,
+        Regexp,
+    }
+
+    impl From<&Node> for NodeType {
+        fn from(n: &Node) -> Self {
+            match n {
+                Node::Unary {..} => NodeType::Unary,
+                Node::Binary {..} => NodeType::Unary,
+                Node::Identifier(_) => NodeType::Identifier,
+                Node::Constant(_) => NodeType::Constant,
+                Node::StringLiteral(_) => NodeType::StringLiteral,
+                Node::Regexp(_) => NodeType::Regexp,
+            }
+        }
+    }
+
     #[derive(Debug, Clone, Copy)]
     pub enum UnaryOp {
         Not, // !A
@@ -151,15 +174,8 @@ pub mod nom_parser {
             })
         }
 
-        pub(crate) fn name(&self) -> &'static str {
-            match self {
-                Node::Regexp(_) => "regex",
-                Node::Identifier(_) => "ident",
-                Node::StringLiteral(_) => "string",
-                Node::Constant(_) => "constant",
-                Node::Unary {op: _, expr: _} => "unary",
-                Node::Binary {lhs: _, op: _, rhs: _} => "binary",
-            }
+        pub(crate) fn get_type(&self) -> NodeType {
+            self.into()
         }
     }
 

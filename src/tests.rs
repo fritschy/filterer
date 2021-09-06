@@ -104,4 +104,9 @@ fn semantic_errors() {
 fn mixing_types() {
     compare("d == 0x1010101", |_| false);
     compare("\"0x100\" == 0x100", |_| true);
+    compare("\"0x100\" == d", |&&x| x == "0x100");
+    compare("d == \"0x200\"", |&&x| x == "0x200");
+    compare("d >= \"0x100\"", |&&x| x == "0x200" || x == "0x100");
+    compare("\"0x200\" == d", |&&x| x == "0x200");
+    compare("\"0x100\" <= d", |&&x| x == "0x200" || x == "0x100");
 }
