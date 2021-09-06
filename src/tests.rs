@@ -22,7 +22,7 @@ impl Accessor for Data<'_> {
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
-        assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m)).map(|m| *m).collect::<Vec<&str>>(),
+        assert_eq!(DATA.iter().filter(|m| p.eval_filter(*m)).map(|m| *m).collect::<Vec<_>>(),
                    DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>());
     }) {
         panic!("{}", p);
