@@ -1,12 +1,12 @@
-use tracing_subscriber::FmtSubscriber;
-use tracing::{Level, info, error as log_err};
 use filterer::nom_parser;
+use tracing::{error as log_err, info, Level};
+use tracing_subscriber::FmtSubscriber;
 
-use std::io;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::io;
 
-use filterer::eval::{Eval, Accessor};
+use filterer::eval::{Accessor, Eval};
 
 #[cfg(feature = "pest")]
 pub use filterer::pest_parser;
@@ -42,26 +42,59 @@ impl<'a> Accessor for Message<'a> {
 
 fn messages() -> Vec<Message<'static>> {
     vec![
-        Message { ts: 0, flags: 0x300, ctx: "render", app: "HMI2", level: 0 },
-        Message { ts: 100, flags: 0x301, ctx: "render", app: "HMI1", level: 0 },
-        Message { ts: 101, flags: 0x201, ctx: "menu",   app: "HMI",  level: 3 },
-        Message { ts: 200, flags: 0x300, ctx: "map",    app: "MAP",  level: 1 },
-        Message { ts: 300, flags: 0x004, ctx: "intersection", app: "SideMAP", level: 1 },
+        Message {
+            ts: 0,
+            flags: 0x300,
+            ctx: "render",
+            app: "HMI2",
+            level: 0,
+        },
+        Message {
+            ts: 100,
+            flags: 0x301,
+            ctx: "render",
+            app: "HMI1",
+            level: 0,
+        },
+        Message {
+            ts: 101,
+            flags: 0x201,
+            ctx: "menu",
+            app: "HMI",
+            level: 3,
+        },
+        Message {
+            ts: 200,
+            flags: 0x300,
+            ctx: "map",
+            app: "MAP",
+            level: 1,
+        },
+        Message {
+            ts: 300,
+            flags: 0x004,
+            ctx: "intersection",
+            app: "SideMAP",
+            level: 1,
+        },
     ]
 }
 
-fn doit(l: &str) {
+fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
-        info!("Got: {:#?}", x.as_ref());
+        if !bench { info!("Got: {:#?}", x.as_ref()); }
         let mut count = 0;
-        //for i in 0..1_000_000 {
+        let max = if bench { 1_000_000 } else { 1 };
+        for i in 0..max {
             for m in messages().iter() {
                 if x.eval_filter(m) {
                     count += 1;
-                    info!("{:?}", m);
+                    if !bench {
+                        info!("{:?}", m);
+                    }
                 }
             }
-        //}
+        }
 
         info!("matched {}/{} messages", count, messages().len());
     }) {
@@ -88,8 +121,10 @@ fn main() -> io::Result<()> {
         //.with_thread_names(true)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    let bench = std::env::args().any(|x| x == "--benchmark" || x == "-b");
+    let mut sw = stopwatch2::Stopwatch::default();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     if std::env::args().nth(1).unwrap_or_else(|| "".to_string()) == "-i" {
         // `()` can be used when no completer is required
@@ -103,29 +138,41 @@ fn main() -> io::Result<()> {
             match readline {
                 Ok(l) => {
                     rl.add_history_entry(l.as_str());
-                    doit(&l);
-                },
+                    sw.start();
+                    doit(&l, bench);
+                    let t = sw.elapsed();
+                    sw.stop();
+                    if bench {
+                        info!("Took {:?}", t);
+                    }
+                }
                 Err(ReadlineError::Interrupted) => {
                     info!("CTRL-C");
-                    break
-                },
+                    break;
+                }
                 Err(ReadlineError::Eof) => {
                     info!("CTRL-D");
-                    break
-                },
+                    break;
+                }
                 Err(err) => {
                     log_err!("Error: {:?}", err);
-                    break
+                    break;
                 }
             }
         }
         rl.save_history("history.txt").unwrap();
     } else {
-        doit("flags == 0x300 || ts < 200");
-        info!("{}", "-".repeat(41));
-        doit("flags & 0x100 != 0b0 && ts <= 0o10101");
-        info!("{}", "-".repeat(41));
-        doit("(((((((((((((((1)))))))))))))))");
+        sw.start();
+        doit("flags == 0x300 || ts < 200", bench);
+        if !bench { info!("{}", "-".repeat(41)); }
+        doit("flags & 0x100 != 0b0 && ts <= 0o10101", bench);
+        if !bench { info!("{}", "-".repeat(41)); }
+        doit("(((((((((((((((1)))))))))))))))", bench);
+        let t = sw.elapsed();
+        sw.stop();
+        if bench {
+            info!("Took {:?}", t);
+        }
     }
 
     Ok(())

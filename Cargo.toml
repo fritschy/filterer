@@ -13,6 +13,7 @@ rustyline = "9.0"
 pest_derive = "2.1.0"
 pest = "2.1.3"
 regex = "1"
+stopwatch2 = "2"
 
 [profile.release]
 lto = true
