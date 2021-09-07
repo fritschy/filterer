@@ -52,36 +52,46 @@ fn re(s: &str) -> Regex {
     Regex::new(s).expect("regex")
 }
 
+fn check(expr: &str, exp: bool) {
+    struct X;
+    impl Accessor for X {
+        fn get_str<'a>(&'a self, _: &str) -> Result<&'a str, String> { Ok("1") }
+        fn get_num(&self, _: &str) -> Result<isize, String> { Ok(1) }
+    }
+    const DATA0: &X = &X;
+    assert!(parse(expr).unwrap().eval_filter(DATA0) == exp);
+}
+
 #[test]
 fn always_true() {
-    compare("1", |_| true);
-    compare("42", |_| true);
-    compare("!0", |_| true);
-    compare("-1 < 0", |_| true);
-    compare("0 > -1", |_| true);
-    compare("0 == -0", |_| true);
-    compare("0xfff & 0x070 == 0x070", |_| true);
-    compare("0xf3f & 0x070 == 0x030", |_| true);
-    compare("1 || 0", |_| true);
-    compare("0 || 1", |_| true);
-    compare("d == d", |_| true);
-    compare("!\"0\"", |_| true);
-    compare("\"1\"", |_| true);
+    check("1", true);
+    check("42", true);
+    check("!0", true);
+    check("-1 < 0", true);
+    check("0 > -1", true);
+    check("0 == -0", true);
+    check("0xfff & 0x070 == 0x070", true);
+    check("0xf3f & 0x070 == 0x030", true);
+    check("1 || 0", true);
+    check("0 || 1", true);
+    check("d == d", true);
+    check("!\"0\"", true);
+    check("\"1\"", true);
 }
 
 #[test]
 fn always_false() {
-    compare("0", |_| false);
-    compare("!1", |_| false);
-    compare("-1 > 0", |_| false);
-    compare("-1 >= 0", |_| false);
-    compare("0 < -1", |_| false);
-    compare("0 <= -1", |_| false);
-    compare("!16180", |_| false);
-    compare("0b0 || -0o0 || does_not_exist", |_| false);
-    compare("/1/", |_| false);
-    compare("1 && 0", |_| false);
-    compare("0 && 1", |_| false);
+    check("0", false);
+    check("!1", false);
+    check("-1 > 0", false);
+    check("-1 >= 0", false);
+    check("0 < -1", false);
+    check("0 <= -1", false);
+    check("!16180", false);
+    check("0b0 || -0o0", false);
+    check("/1/", false);
+    check("1 && 0", false);
+    check("0 && 1", false);
 }
 
 #[test]
