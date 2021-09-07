@@ -152,7 +152,7 @@ pub mod nom_parser {
             if let Ok(re) = regex::Regex::new(i) {
                 Box::new(Node::Regexp(re))
             } else {
-                Box::new(Node::Regexp(regex::Regex::new("").unwrap()))
+                Box::new(Node::Regexp(regex::Regex::new("$.").unwrap()))
             }
         }
 

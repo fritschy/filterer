@@ -92,12 +92,18 @@ fn always_false() {
     check("/1/", false);
     check("1 && 0", false);
     check("0 && 1", false);
+    check("0.1", false);
+
+    compare("does_not_exist", |_| false);
 }
 
 #[test]
 fn regexes() {
     compare("d =~ /a/", |x| re("a").is_match(x));
     compare("!(d =~ /a/)", |x| !re("a").is_match(x));
+
+    // Invalid regex will be replaced by a not-matching regex
+    compare("d =~ /(/", |_| false);
 }
 
 #[test]
