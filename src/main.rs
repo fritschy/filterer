@@ -20,6 +20,9 @@ struct Message<'a> {
     level: usize,
 }
 
+mod sw;
+use sw::Stopwatch;
+
 impl<'a> Display for Message<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -123,7 +126,6 @@ fn doit(l: &str, bench: bool) {
 
 fn main() -> io::Result<()> {
     let bench = std::env::args().any(|x| x == "--benchmark" || x == "-b");
-    let mut sw = stopwatch2::Stopwatch::default();
 
     if std::env::args().nth(1).unwrap_or_else(|| "".to_string()) == "-i" {
         // `()` can be used when no completer is required
@@ -135,10 +137,9 @@ fn main() -> io::Result<()> {
             match readline {
                 Ok(l) => {
                     rl.add_history_entry(l.as_str());
-                    sw.start();
+                    let sw = Stopwatch::new();
                     doit(&l, bench);
                     let t = sw.elapsed();
-                    sw.stop();
                     if bench {
                         println!("Took {:?}", t);
                     }
@@ -158,7 +159,7 @@ fn main() -> io::Result<()> {
 
         rl.save_history("history.txt").unwrap();
     } else {
-        sw.start();
+        let sw = Stopwatch::new();
         doit("flags == 0x300 || ts < 200", bench);
         if !bench {
             println!("{}", "-".repeat(41));
@@ -169,7 +170,6 @@ fn main() -> io::Result<()> {
         }
         doit("(((((((((((((((1)))))))))))))))", bench);
         let t = sw.elapsed();
-        sw.stop();
         if bench {
             println!("Took {:?}", t);
         }
