@@ -8,10 +8,11 @@ use std::io;
 
 use filterer::eval::{Accessor, Eval};
 
-#[cfg(feature = "pest")]
+#[cfg(feature = "pest_parser")]
 pub use filterer::pest_parser;
-
+#[cfg(feature = "pest_parser")]
 pub use pest::Parser;
+
 
 #[derive(Debug, Clone)]
 struct Message<'a> {
@@ -101,10 +102,10 @@ fn doit(l: &str, bench: bool) {
         log_err!("{}", e);
     }
 
-    #[cfg(feature = "pest")]
+    #[cfg(feature = "pest_parser")]
     {
-        if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|_x| {
-            //info!("Got: {}", x);
+        if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|x| {
+            info!("pest_parser, Got: {}", x);
         }) {
             log_err!("Got error: {:?}", e);
         }

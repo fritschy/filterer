@@ -449,7 +449,7 @@ pub mod eval;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "pest")]
+#[cfg(feature = "pest_parser")]
 pub mod pest_parser {
     #[derive(pest_derive::Parser, Debug, Clone)]
     #[grammar = "filter.pest"]
