@@ -64,10 +64,7 @@ impl<'a> Value<'a> {
     fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
-            Value::Str(x) => {
-                tracing::warn!("as_int() from string!");
-                parse_num(*x)
-            }
+            Value::Str(x) => parse_num(*x),
             _ => panic!("as_int() needs to be a number"),
         }
     }
@@ -83,14 +80,8 @@ impl<'a> Value<'a> {
     fn as_str(&self) -> &str {
         match self {
             Value::Str(s) => *s,
-            Value::Int(0) | Value::Re(_) => {
-                tracing::warn!("as_str on int or re");
-                "0"
-            }
-            Value::Int(_) => {
-                tracing::warn!("as_str on int");
-                "1"
-            }
+            Value::Int(0) | Value::Re(_) => "0",
+            Value::Int(_) => "1",
         }
     }
 
@@ -136,8 +127,6 @@ fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
 impl Eval<&dyn Accessor> for Box<Node> {
     fn eval_filter(&self, e: &dyn Accessor) -> bool {
         fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value<'a> {
-            tracing::trace!("eval, node={:?}", node);
-
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     let l = eval(lhs, e);

@@ -1,6 +1,4 @@
 use filterer::nom_parser;
-use tracing::{error, info, warn, Level};
-use tracing_subscriber::FmtSubscriber;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -93,7 +91,7 @@ fn messages() -> Vec<Message<'static>> {
 fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
         if !bench {
-            info!("Got: {:#?}", x.as_ref());
+            println!("Got: {:#?}", x.as_ref());
         }
         let mut count = 0;
         let max = if bench { 1_000_000 } else { 1 };
@@ -102,48 +100,35 @@ fn doit(l: &str, bench: bool) {
                 if x.eval_filter(m) {
                     count += 1;
                     if !bench {
-                        info!("{}", m);
+                        println!("{}", m);
                     }
                 }
             }
         }
 
-        info!("matched {}/{} messages", count, messages().len());
+        println!("matched {}/{} messages", count, messages().len());
     }) {
-        error!("{}", e);
+        eprintln!("{}", e);
     }
 
     #[cfg(feature = "pest_parser")]
     {
         if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|x| {
-            info!("pest_parser, Got: {}", x);
+            println!("pest_parser, Got: {}", x);
         }) {
-            error!("Got error: {:?}", e);
+            eprintln!("Got error: {:?}", e);
         }
     }
 }
 
 fn main() -> io::Result<()> {
-    // a builder for `FmtSubscriber`.
-    let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_max_level(Level::INFO)
-        // completes the builder.
-        //.with_thread_names(true)
-        .finish();
-
     let bench = std::env::args().any(|x| x == "--benchmark" || x == "-b");
     let mut sw = stopwatch2::Stopwatch::default();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     if std::env::args().nth(1).unwrap_or_else(|| "".to_string()) == "-i" {
         // `()` can be used when no completer is required
         let mut rl = Editor::<()>::new();
-        if rl.load_history("history.txt").is_err() {
-            warn!("No previous history.");
-        }
+        if rl.load_history("history.txt").is_err() {}
 
         loop {
             let readline = rl.readline(">> ");
@@ -155,7 +140,7 @@ fn main() -> io::Result<()> {
                     let t = sw.elapsed();
                     sw.stop();
                     if bench {
-                        info!("Took {:?}", t);
+                        println!("Took {:?}", t);
                     }
                 }
                 Err(ReadlineError::Interrupted) => {
@@ -165,7 +150,7 @@ fn main() -> io::Result<()> {
                     break;
                 }
                 Err(err) => {
-                    error!("Error: {:?}", err);
+                    eprintln!("Error: {:?}", err);
                     break;
                 }
             }
@@ -176,17 +161,17 @@ fn main() -> io::Result<()> {
         sw.start();
         doit("flags == 0x300 || ts < 200", bench);
         if !bench {
-            info!("{}", "-".repeat(41));
+            println!("{}", "-".repeat(41));
         }
         doit("flags & 0x100 != 0b0 && ts <= 0o10101", bench);
         if !bench {
-            info!("{}", "-".repeat(41));
+            println!("{}", "-".repeat(41));
         }
         doit("(((((((((((((((1)))))))))))))))", bench);
         let t = sw.elapsed();
         sw.stop();
         if bench {
-            info!("Took {:?}", t);
+            println!("Took {:?}", t);
         }
     }
 
