@@ -176,7 +176,6 @@ impl Eval<&dyn Accessor> for Box<Node> {
                                 BinaryOp::Band => {
                                     Value::Int(l.as_int() & r.as_int())
                                 },
-                                BinaryOp::Bor => unreachable!(),
                                 BinaryOp::Or | BinaryOp::And => unreachable!(),
                             }
                         }

@@ -85,7 +85,6 @@ pub mod nom_parser {
         Match, // A =~ B
 
         Band, // A &  B
-        Bor,  // A |  B
 
         And, // A && B
         Or,  // A || B
