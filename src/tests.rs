@@ -1,5 +1,6 @@
 use crate::eval::*;
 use crate::nom_parser::parse;
+use regex::Regex;
 
 type Data<'a> = &'a str;
 
@@ -44,6 +45,10 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     }
 }
 
+fn re(s: &str) -> Regex {
+    Regex::new(s).expect("regex")
+}
+
 #[test]
 fn always_true() {
     compare("1", |_| true);
@@ -75,9 +80,9 @@ fn always_false() {
 
 #[test]
 fn regexes() {
-    compare("d =~ /a/", |x| regex::Regex::new("a").unwrap().is_match(x));
+    compare("d =~ /a/", |x| re("a").is_match(x));
     compare("!(d =~ /a/)", |x| {
-        !regex::Regex::new("a").unwrap().is_match(x)
+        !re("a").is_match(x)
     });
 }
 
@@ -152,4 +157,57 @@ fn mixing_types() {
     compare("d >= \"0x100\"", |&&x| x == "0x200" || x == "0x100");
     compare("\"0x200\" == d", |&&x| x == "0x200");
     compare("\"0x100\" <= d", |&&x| x == "0x200" || x == "0x100");
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+struct Item<'a>(isize, &'a str, isize);
+
+impl<'a> Accessor for Item<'a> {
+    fn get_str(&self, k: &str) -> Result<&'a str, String> {
+        match k {
+            "s" => Ok(self.1),
+            _ => Err(format!("No such key: {}", k)),
+        }
+    }
+
+    fn get_num(&self, k: &str) -> Result<isize, String> {
+        match k {
+            "i" => Ok(self.0),
+            "u" => Ok(self.2),
+            _ => Err(format!("No such key: {}", k)),
+        }
+    }
+}
+
+const DATA2: &[Item] = &[
+    Item(0, "null", 0x100),
+    Item(1, "eins", 0x002),
+    Item(2, "zwo", 0x002),
+    Item(3, "drei", 0x002),
+    Item(4, "vier", 0x003),
+    Item(5, "fünnef", 0x104),
+    Item(6, "sechs", 0x101),
+    Item(7, "sieben", 0x104),
+    Item(8, "acht", 0x102),
+];
+
+fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
+    if let Err(p) = parse(expr).map(|p| {
+        assert_eq!(
+            DATA2.iter()
+                .filter(|m| p.eval_filter(*m))
+                .map(|m| *m)
+                .collect::<Vec<_>>(),
+            DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>()
+        );
+    }) {
+        panic!("{}", p);
+    }
+}
+
+#[test]
+fn comprehensive_data() {
+    compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
+    compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
+    compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| u & 0x100 != 0 && i < 7);
 }
