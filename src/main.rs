@@ -1,5 +1,5 @@
 use filterer::nom_parser;
-use tracing::{error as log_err, info, Level};
+use tracing::{error, warn, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use rustyline::error::ReadlineError;
@@ -12,15 +12,21 @@ use filterer::eval::{Accessor, Eval};
 pub use filterer::pest_parser;
 #[cfg(feature = "pest_parser")]
 pub use pest::Parser;
+use std::fmt::{Display, Formatter};
 
 
-#[derive(Debug, Clone)]
 struct Message<'a> {
     ts: usize,
     flags: usize,
     ctx: &'a str,
     app: &'a str,
     level: usize,
+}
+
+impl<'a> Display for Message<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[T {:<3} F 0x{:04x} C'{}' A'{}' L {}]", self.ts, self.flags, self.ctx, self.app, self.level)
+    }
 }
 
 impl<'a> Accessor for Message<'a> {
@@ -91,7 +97,7 @@ fn doit(l: &str, bench: bool) {
                 if x.eval_filter(m) {
                     count += 1;
                     if !bench {
-                        info!("{:?}", m);
+                        info!("{}", m);
                     }
                 }
             }
@@ -99,7 +105,7 @@ fn doit(l: &str, bench: bool) {
 
         info!("matched {}/{} messages", count, messages().len());
     }) {
-        log_err!("{}", e);
+        error!("{}", e);
     }
 
     #[cfg(feature = "pest_parser")]
@@ -107,7 +113,7 @@ fn doit(l: &str, bench: bool) {
         if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|x| {
             info!("pest_parser, Got: {}", x);
         }) {
-            log_err!("Got error: {:?}", e);
+            error!("Got error: {:?}", e);
         }
     }
 }
@@ -131,7 +137,7 @@ fn main() -> io::Result<()> {
         // `()` can be used when no completer is required
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
-            println!("No previous history.");
+            warn!("No previous history.");
         }
 
         loop {
@@ -148,19 +154,18 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Err(ReadlineError::Interrupted) => {
-                    info!("CTRL-C");
                     break;
                 }
                 Err(ReadlineError::Eof) => {
-                    info!("CTRL-D");
                     break;
                 }
                 Err(err) => {
-                    log_err!("Error: {:?}", err);
+                    error!("Error: {:?}", err);
                     break;
                 }
             }
         }
+
         rl.save_history("history.txt").unwrap();
     } else {
         sw.start();
