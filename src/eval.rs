@@ -1,6 +1,6 @@
 // quick and hacked implementation of an expression evaluation
 
-use crate::nom_parser::{Node, BinaryOp, UnaryOp};
+use crate::nom_parser::{BinaryOp, Node, UnaryOp};
 use regex::Regex;
 
 pub fn parse_num(i: &str) -> isize {
@@ -24,8 +24,11 @@ enum Value<'a> {
 
 impl<'a> From<bool> for Value<'a> {
     fn from(b: bool) -> Self {
-        if b { Self::Int(1) }
-        else { Self::Int(0) }
+        if b {
+            Self::Int(1)
+        } else {
+            Self::Int(0)
+        }
     }
 }
 
@@ -64,7 +67,7 @@ impl<'a> Value<'a> {
             Value::Str(x) => {
                 tracing::warn!("as_int() from string!");
                 parse_num(*x)
-            },
+            }
             _ => panic!("as_int() needs to be a number"),
         }
     }
@@ -123,12 +126,11 @@ fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
             } else {
                 None
             }
-        },
+        }
         Node::Regexp(re) => Some(Value::Re(re)),
         _ => unreachable!(),
     }
 }
-
 
 // FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<&dyn Accessor> for Box<Node> {
@@ -141,53 +143,31 @@ impl Eval<&dyn Accessor> for Box<Node> {
                     let l = eval(lhs, e);
 
                     match op {
-                        BinaryOp::And => {
-                            (l.as_bool() && eval(rhs, e).as_bool()).into()
-                        },
-                        BinaryOp::Or  => {
-                            (l.as_bool() || eval(rhs, e).as_bool()).into()
-                        },
+                        BinaryOp::And => (l.as_bool() && eval(rhs, e).as_bool()).into(),
+                        BinaryOp::Or => (l.as_bool() || eval(rhs, e).as_bool()).into(),
                         _ => {
                             let r = eval(rhs, e);
 
                             match op {
-                                BinaryOp::Eq => {
-                                    (l == r).into()
-                                },
-                                BinaryOp::Ne => {
-                                    (l != r).into()
-                                },
-                                BinaryOp::Ge => {
-                                    (l.as_int() >= r.as_int()).into()
-                                },
-                                BinaryOp::Gt => {
-                                    (l.as_int() > r.as_int()).into()
-                                },
-                                BinaryOp::Le => {
-                                    (l.as_int() <= r.as_int()).into()
-                                },
-                                BinaryOp::Lt => {
-                                    (l.as_int() < r.as_int()).into()
-                                },
-                                BinaryOp::Match => {
-                                    (r.as_re().is_match(l.as_str())).into()
-                                },
+                                BinaryOp::Eq => (l == r).into(),
+                                BinaryOp::Ne => (l != r).into(),
+                                BinaryOp::Ge => (l.as_int() >= r.as_int()).into(),
+                                BinaryOp::Gt => (l.as_int() > r.as_int()).into(),
+                                BinaryOp::Le => (l.as_int() <= r.as_int()).into(),
+                                BinaryOp::Lt => (l.as_int() < r.as_int()).into(),
+                                BinaryOp::Match => (r.as_re().is_match(l.as_str())).into(),
 
-                                BinaryOp::Band => {
-                                    Value::Int(l.as_int() & r.as_int())
-                                },
+                                BinaryOp::Band => Value::Int(l.as_int() & r.as_int()),
                                 BinaryOp::Or | BinaryOp::And => unreachable!(),
                             }
                         }
                     }
                 }
 
-                Node::Unary { op, expr } => {
-                    match op {
-                        UnaryOp::Not => { Value::Int(if !eval(expr, e).as_bool() { 1 } else { 0 }) }
-                        UnaryOp::Neg => { Value::Int(-eval(expr, e).as_int()) }
-                    }
-                }
+                Node::Unary { op, expr } => match op {
+                    UnaryOp::Not => Value::Int(if !eval(expr, e).as_bool() { 1 } else { 0 }),
+                    UnaryOp::Neg => Value::Int(-eval(expr, e).as_int()),
+                },
 
                 _ => value(node, e).unwrap_or(Value::Int(0)),
             }

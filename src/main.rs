@@ -1,5 +1,5 @@
 use filterer::nom_parser;
-use tracing::{error, warn, info, Level};
+use tracing::{error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use rustyline::error::ReadlineError;
@@ -14,7 +14,6 @@ pub use filterer::pest_parser;
 pub use pest::Parser;
 use std::fmt::{Display, Formatter};
 
-
 struct Message<'a> {
     ts: usize,
     flags: usize,
@@ -25,7 +24,11 @@ struct Message<'a> {
 
 impl<'a> Display for Message<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[T {:<3} F 0x{:04x} C'{}' A'{}' L {}]", self.ts, self.flags, self.ctx, self.app, self.level)
+        write!(
+            f,
+            "[T {:<3} F 0x{:04x} C'{}' A'{}' L {}]",
+            self.ts, self.flags, self.ctx, self.app, self.level
+        )
     }
 }
 
@@ -89,7 +92,9 @@ fn messages() -> Vec<Message<'static>> {
 
 fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
-        if !bench { info!("Got: {:#?}", x.as_ref()); }
+        if !bench {
+            info!("Got: {:#?}", x.as_ref());
+        }
         let mut count = 0;
         let max = if bench { 1_000_000 } else { 1 };
         for _i in 0..max {
@@ -170,9 +175,13 @@ fn main() -> io::Result<()> {
     } else {
         sw.start();
         doit("flags == 0x300 || ts < 200", bench);
-        if !bench { info!("{}", "-".repeat(41)); }
+        if !bench {
+            info!("{}", "-".repeat(41));
+        }
         doit("flags & 0x100 != 0b0 && ts <= 0o10101", bench);
-        if !bench { info!("{}", "-".repeat(41)); }
+        if !bench {
+            info!("{}", "-".repeat(41));
+        }
         doit("(((((((((((((((1)))))))))))))))", bench);
         let t = sw.elapsed();
         sw.stop();

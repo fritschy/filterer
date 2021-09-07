@@ -56,8 +56,8 @@ pub mod nom_parser {
     impl From<&Node> for NodeType {
         fn from(n: &Node) -> Self {
             match n {
-                Node::Unary {..} => NodeType::Unary,
-                Node::Binary {..} => NodeType::Unary,
+                Node::Unary { .. } => NodeType::Unary,
+                Node::Binary { .. } => NodeType::Unary,
                 Node::Identifier(_) => NodeType::Identifier,
                 Node::Constant(_) => NodeType::Constant,
                 Node::StringLiteral(_) => NodeType::StringLiteral,
@@ -159,18 +159,11 @@ pub mod nom_parser {
         }
 
         fn new_binary(lhs: Box<Node>, op: BinaryOp, rhs: Box<Node>) -> Box<Node> {
-            Box::new(Node::Binary {
-                lhs,
-                op,
-                rhs,
-            })
+            Box::new(Node::Binary { lhs, op, rhs })
         }
 
         fn new_unary(op: UnaryOp, expr: Box<Node>) -> Box<Node> {
-            Box::new(Node::Unary {
-                op,
-                expr,
-            })
+            Box::new(Node::Unary { op, expr })
         }
 
         pub(crate) fn get_type(&self) -> NodeType {
@@ -325,12 +318,15 @@ pub mod nom_parser {
             numeric,
             string("\"", &Node::from_string),
             string("/", &Node::from_regexp),
-            parens_expr
+            parens_expr,
         ))(i)
     }
 
     // FIXME: this one sucks particularly HARD
-    fn string<'a>(delimiter: Input<'a>, map_to: &'a impl Fn(Input) -> Box<Node>) -> impl Fn(Input) -> IResult<Input, Box<Node>> + 'a {
+    fn string<'a>(
+        delimiter: Input<'a>,
+        map_to: &'a impl Fn(Input) -> Box<Node>,
+    ) -> impl Fn(Input) -> IResult<Input, Box<Node>> + 'a {
         move |i| {
             trace!("string: i={}", i);
             map(
