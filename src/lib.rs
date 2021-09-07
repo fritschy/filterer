@@ -25,7 +25,7 @@ pub mod nom_parser {
     use std::fmt;
     use std::num::ParseIntError;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     pub enum Node {
         Unary {
             op: UnaryOp,
@@ -42,7 +42,7 @@ pub mod nom_parser {
         Regexp(regex::Regex),
     }
 
-    #[derive(PartialEq, Copy, Clone)]
+    #[derive(PartialEq)]
     pub enum NodeType {
         Unary,
         Binary,
@@ -65,14 +65,14 @@ pub mod nom_parser {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug)]
     pub enum UnaryOp {
         Not, // !A
         Neg, // -A
     }
 
     // Do we need this.... now?
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug)]
     pub enum BinaryOp {
         Eq, // A == B
         Ne, // A != B
