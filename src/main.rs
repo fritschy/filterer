@@ -85,7 +85,7 @@ fn doit(l: &str, bench: bool) {
         if !bench { info!("Got: {:#?}", x.as_ref()); }
         let mut count = 0;
         let max = if bench { 1_000_000 } else { 1 };
-        for i in 0..max {
+        for _i in 0..max {
             for m in messages().iter() {
                 if x.eval_filter(m) {
                     count += 1;
