@@ -33,11 +33,14 @@ impl Accessor for Data<'_> {
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
+        let d = DATA.iter()
+            .filter(|m| p.eval_filter(*m))
+            .map(|m| *m)
+            .collect::<Vec<_>>();
+        println!("(compare) Selected: {:?}", &d);
+
         assert_eq!(
-            DATA.iter()
-                .filter(|m| p.eval_filter(*m))
-                .map(|m| *m)
-                .collect::<Vec<_>>(),
+            d,
             DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>()
         );
     }) {
@@ -197,11 +200,15 @@ const DATA2: &[Item] = &[
 
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
+        let d = DATA2.iter()
+            .filter(|m| p.eval_filter(*m))
+            .map(|m| *m)
+            .collect::<Vec<_>>();
+
+        println!("(compare2) Selected: {:?}", &d);
+
         assert_eq!(
-            DATA2.iter()
-                .filter(|m| p.eval_filter(*m))
-                .map(|m| *m)
-                .collect::<Vec<_>>(),
+            d,
             DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>()
         );
     }) {
