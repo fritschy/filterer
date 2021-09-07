@@ -102,7 +102,6 @@ pub mod nom_parser {
                 "<" => BinaryOp::Lt,
                 "=~" => BinaryOp::Match,
                 "&" => BinaryOp::Band,
-                "|" => unreachable!(),
                 "&&" => BinaryOp::And,
                 "||" => BinaryOp::Or,
                 _ => unreachable!("Unknown operator {}", i),

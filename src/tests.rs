@@ -61,6 +61,9 @@ fn always_true() {
     compare("0xf3f & 0x070 == 0x030", |_| true);
     compare("1 || 0", |_| true);
     compare("0 || 1", |_| true);
+    compare("d == d", |_| true);
+    compare("!\"0\"", |_| true);
+    compare("\"1\"", |_| true);
 }
 
 #[test]
@@ -81,9 +84,7 @@ fn always_false() {
 #[test]
 fn regexes() {
     compare("d =~ /a/", |x| re("a").is_match(x));
-    compare("!(d =~ /a/)", |x| {
-        !re("a").is_match(x)
-    });
+    compare("!(d =~ /a/)", |x| !re("a").is_match(x));
 }
 
 #[test]
@@ -146,6 +147,8 @@ fn semantic_errors() {
     println!("{}", parse("app == /moo/").unwrap_err().describe());
     println!("{}", parse("/moo/ && 1").unwrap_err().describe());
     println!("{}", parse("1 || /moo/").unwrap_err().describe());
+    println!("{}", parse("! /moo/").unwrap_err().describe());
+    println!("{}", parse("/moo/ == /^moo$/").unwrap_err().describe());
 }
 
 #[test]
@@ -157,6 +160,7 @@ fn mixing_types() {
     compare("d >= \"0x100\"", |&&x| x == "0x200" || x == "0x100");
     compare("\"0x200\" == d", |&&x| x == "0x200");
     compare("\"0x100\" <= d", |&&x| x == "0x200" || x == "0x100");
+    compare("0x100 == d", |&&x| x == "0x100");
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
