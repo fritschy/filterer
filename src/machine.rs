@@ -1,23 +1,10 @@
-use filterer::eval::{Accessor, parse_num, Value};
-use filterer::nom_parser::{BinaryOp, Node, UnaryOp};
+use crate::eval::{Accessor, Value};
+use crate::nom_parser::{BinaryOp, Node, UnaryOp};
+
 use regex::Regex;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 use std::cell::RefCell;
-
-#[derive(Debug)]
-pub struct CodeGen<'a> {
-    buf: Vec<Instr<'a>>,
-}
-
-impl Display for CodeGen<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for i in self.buf.iter() {
-            write!(f, "    {}", i)?;
-        }
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 pub enum Instr<'a> {
@@ -110,7 +97,7 @@ pub struct Machine<'a> {
 impl Display for Machine<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for i in self.instr.iter() {
-            write!(f, "{}\n", i)?;
+            writeln!(f, "{}", i)?;
         }
         Ok(())
     }
@@ -121,13 +108,14 @@ impl<'a> Machine<'a> {
         fn compile_<'a>(buf: &mut Vec<Instr<'a>>, node: &'a Node) -> Result<(), String> {
             match node {
                 Node::Binary { rhs, op, lhs } => {
+                    // This needs to be reversed for eval.
                     compile_(buf, lhs)?;
                     compile_(buf, rhs)?;
                     buf.push(op.into());
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, &expr)?;
+                    compile_(buf, expr)?;
                     buf.push(op.into());
                 },
 
@@ -138,7 +126,7 @@ impl<'a> Machine<'a> {
         }
 
         let mut buf = Vec::new();
-        if compile_(&mut buf, &node).is_ok() {
+        if compile_(&mut buf, node).is_ok() {
             buf.push(Instr::Ret);
             Ok(Machine { instr: buf, mem: RefCell::new(Vec::new()) })
         } else {

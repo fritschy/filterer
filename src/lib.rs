@@ -119,7 +119,7 @@ pub mod nom_parser {
         }
     }
 
-    pub(crate) fn parse_num(i: &str) -> Result<isize, ParseIntError> {
+    pub fn parse_num(i: &str) -> Result<isize, ParseIntError> {
         if let Some(i) = i.strip_prefix("0x") {
             isize::from_str_radix(i, 16)
         } else if let Some(i) = i.strip_prefix("0o") {
@@ -424,6 +424,8 @@ pub mod nom_parser {
 mod sema;
 
 pub mod eval;
+
+pub mod machine;
 
 #[cfg(test)]
 mod tests;
