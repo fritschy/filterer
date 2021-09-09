@@ -1,4 +1,4 @@
-use crate::eval::{Accessor, Value};
+use crate::eval::{Eval, Accessor, Value};
 use crate::nom_parser::{BinaryOp, Node, UnaryOp};
 
 use regex::Regex;
@@ -23,7 +23,6 @@ pub enum Instr<'a> {
     Match,
     Not,
     Neg,
-    Ret,
 }
 
 impl Display for Instr<'_> {
@@ -48,7 +47,6 @@ impl Display for Instr<'_> {
                 Instr::Match => "match".into(),
                 Instr::Not => "not".into(),
                 Instr::Neg => "neg".into(),
-                Instr::Ret => "ret".into(),
             }
         )
     }
@@ -130,7 +128,6 @@ impl<'a> Machine<'a> {
 
         let mut buf = Vec::new();
         if compile_(&mut buf, node).is_ok() {
-            buf.push(Instr::Ret);
             Ok(Machine {
                 instr: buf,
                 mem: RefCell::new(Vec::new()),
@@ -146,95 +143,107 @@ impl<'a> Machine<'a> {
 
         // let mut mem = unsafe { Vec::from_raw_parts(memp.as_mut_ptr(), memp.len(), memp.capacity()) };
 
-        let mut mem = self.mem.borrow_mut();
-        mem.clear();
+        fn eval_<'a>(mach: &Machine<'a>, a: &'a dyn Accessor) -> Option<bool> {
+            let mut mem = mach.mem.borrow_mut();
+            mem.clear();
 
-        for i in self.instr.iter() {
-            match *i {
-                Instr::LoadIdent(x) => {
-                    if a.is_int(x) {
-                        mem.push(Value::Int(a.get_num(x).unwrap()))
-                    } else if a.is_str(x) {
-                        mem.push(Value::Str(a.get_str(x).unwrap()))
-                    } else {
-                        mem.push(Value::Int(0))
+            for i in mach.instr.iter() {
+                match *i {
+                    Instr::LoadIdent(x) => {
+                        if a.is_int(x) {
+                            mem.push(Value::Int(a.get_num(x).ok()?))
+                        } else if a.is_str(x) {
+                            mem.push(Value::Str(a.get_str(x).ok()?))
+                        } else {
+                            mem.push(Value::Int(0))
+                        }
+                    }
+
+                    Instr::LoadString(x) => mem.push(Value::Str(x)),
+                    Instr::LoadNum(x) => mem.push(Value::Int(x)),
+                    Instr::LoadRe(x) => mem.push(Value::Re(x)),
+
+                    Instr::Eq => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l == r).into());
+                    }
+                    Instr::Ne => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l != r).into());
+                    }
+
+                    Instr::Gt => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_int() > r.as_int()).into());
+                    }
+                    Instr::Ge => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_int() >= r.as_int()).into());
+                    }
+                    Instr::Lt => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_int() < r.as_int()).into());
+                    }
+                    Instr::Le => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_int() <= r.as_int()).into());
+                    }
+
+                    // Yes, there is no short-circuit here...
+                    Instr::And => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_bool() && r.as_bool()).into());
+                    }
+                    Instr::Or => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_bool() || r.as_bool()).into());
+                    }
+
+                    Instr::BAnd => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((l.as_int() & r.as_int()).into());
+                    }
+                    Instr::Match => {
+                        let r = mem.pop()?;
+                        let l = mem.pop()?;
+                        mem.push((r.as_re().is_match(l.as_str())).into());
+                    }
+
+                    Instr::Not => {
+                        let e = mem.pop()?;
+                        mem.push((!e.as_bool()).into());
+                    }
+                    Instr::Neg => {
+                        let e = mem.pop()?;
+                        mem.push((-e.as_int()).into());
                     }
                 }
-
-                Instr::LoadString(x) => mem.push(Value::Str(x)),
-                Instr::LoadNum(x) => mem.push(Value::Int(x)),
-                Instr::LoadRe(x) => mem.push(Value::Re(x)),
-
-                Instr::Eq => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l == r).into());
-                }
-                Instr::Ne => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l != r).into());
-                }
-
-                Instr::Gt => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_int() > r.as_int()).into());
-                }
-                Instr::Ge => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_int() >= r.as_int()).into());
-                }
-                Instr::Lt => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_int() < r.as_int()).into());
-                }
-                Instr::Le => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_int() <= r.as_int()).into());
-                }
-
-                // Yes, there is no short-circuit here...
-                Instr::And => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_bool() && r.as_bool()).into());
-                }
-                Instr::Or => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_bool() || r.as_bool()).into());
-                }
-
-                Instr::BAnd => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((l.as_int() & r.as_int()).into());
-                }
-                Instr::Match => {
-                    let r = mem.pop().unwrap();
-                    let l = mem.pop().unwrap();
-                    mem.push((r.as_re().is_match(l.as_str())).into());
-                }
-
-                Instr::Not => {
-                    let e = mem.pop().unwrap();
-                    mem.push((!e.as_bool()).into());
-                }
-                Instr::Neg => {
-                    let e = mem.pop().unwrap();
-                    mem.push((-e.as_int()).into());
-                }
-
-                Instr::Ret => {
-                    return mem.pop().unwrap().as_bool();
-                }
             }
+
+            mem.pop().map(|x| x.as_bool())
         }
 
-        false
+        match eval_(self, a) {
+            Some(r) => r,
+            _ => {
+                eprintln!("Could not evaluate expression");
+                false
+            }
+        }
+    }
+}
+
+impl<'a> Eval<&'a dyn Accessor> for Machine<'a> {
+    fn eval_filter(&self, e: &'a dyn Accessor) -> bool {
+        self.eval(e)
     }
 }
