@@ -11,8 +11,12 @@ pub trait Accessor {
     fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String>;
     fn get_num(&self, k: &str) -> Result<isize, String>;
 
-    fn is_int(&self, k: &str) -> bool { matches!(self.get_num(k), Ok(_)) }
-    fn is_str(&self, k: &str) -> bool { matches!(self.get_str(k), Ok(_)) }
+    fn is_int(&self, k: &str) -> bool {
+        matches!(self.get_num(k), Ok(_))
+    }
+    fn is_str(&self, k: &str) -> bool {
+        matches!(self.get_str(k), Ok(_))
+    }
 }
 
 pub trait Eval<T> {

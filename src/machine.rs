@@ -2,9 +2,8 @@ use crate::eval::{Accessor, Value};
 use crate::nom_parser::{BinaryOp, Node, UnaryOp};
 
 use regex::Regex;
-use std::fmt::{Display, Formatter};
-use std::fmt;
 use std::cell::RefCell;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub enum Instr<'a> {
@@ -29,25 +28,29 @@ pub enum Instr<'a> {
 
 impl Display for Instr<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Instr::LoadIdent(x) => format!("load ident {}", x),
-            Instr::LoadString(x) => format!("load string \"{}\"", x),
-            Instr::LoadNum(x) => format!("load num {}", x),
-            Instr::LoadRe(x) => format!("load re /{:?}/", x),
-            Instr::And => "and".into(),
-            Instr::Or => "or".into(),
-            Instr::Eq => "eq".into(),
-            Instr::Ne => "ne".into(),
-            Instr::Lt => "lt".into(),
-            Instr::Le => "le".into(),
-            Instr::Gt => "gt".into(),
-            Instr::Ge => "ge".into(),
-            Instr::BAnd => "band".into(),
-            Instr::Match => "match".into(),
-            Instr::Not => "not".into(),
-            Instr::Neg => "neg".into(),
-            Instr::Ret => "ret".into(),
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Instr::LoadIdent(x) => format!("load ident {}", x),
+                Instr::LoadString(x) => format!("load string \"{}\"", x),
+                Instr::LoadNum(x) => format!("load num {}", x),
+                Instr::LoadRe(x) => format!("load re /{:?}/", x),
+                Instr::And => "and".into(),
+                Instr::Or => "or".into(),
+                Instr::Eq => "eq".into(),
+                Instr::Ne => "ne".into(),
+                Instr::Lt => "lt".into(),
+                Instr::Le => "le".into(),
+                Instr::Gt => "gt".into(),
+                Instr::Ge => "ge".into(),
+                Instr::BAnd => "band".into(),
+                Instr::Match => "match".into(),
+                Instr::Not => "not".into(),
+                Instr::Neg => "neg".into(),
+                Instr::Ret => "ret".into(),
+            }
+        )
     }
 }
 
@@ -117,7 +120,7 @@ impl<'a> Machine<'a> {
                 Node::Unary { op, expr } => {
                     compile_(buf, expr)?;
                     buf.push(op.into());
-                },
+                }
 
                 _ => buf.push(node.into()),
             }
@@ -128,12 +131,14 @@ impl<'a> Machine<'a> {
         let mut buf = Vec::new();
         if compile_(&mut buf, node).is_ok() {
             buf.push(Instr::Ret);
-            Ok(Machine { instr: buf, mem: RefCell::new(Vec::new()) })
+            Ok(Machine {
+                instr: buf,
+                mem: RefCell::new(Vec::new()),
+            })
         } else {
             Err("Could not compile".into())
         }
     }
-
 
     pub fn eval(&self, a: &'a dyn Accessor) -> bool {
         // let mut memp = self.mem.borrow_mut();
@@ -154,28 +159,76 @@ impl<'a> Machine<'a> {
                     } else {
                         mem.push(Value::Int(0))
                     }
-                },
+                }
 
                 Instr::LoadString(x) => mem.push(Value::Str(x)),
                 Instr::LoadNum(x) => mem.push(Value::Int(x)),
                 Instr::LoadRe(x) => mem.push(Value::Re(x)),
 
-                Instr::Eq => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l == r).into()); }
-                Instr::Ne => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l != r).into()); }
+                Instr::Eq => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l == r).into());
+                }
+                Instr::Ne => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l != r).into());
+                }
 
-                Instr::Gt => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_int() >  r.as_int()).into()); }
-                Instr::Ge => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_int() >= r.as_int()).into()); }
-                Instr::Lt => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_int() <  r.as_int()).into()); }
-                Instr::Le => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_int() <= r.as_int()).into()); }
+                Instr::Gt => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_int() > r.as_int()).into());
+                }
+                Instr::Ge => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_int() >= r.as_int()).into());
+                }
+                Instr::Lt => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_int() < r.as_int()).into());
+                }
+                Instr::Le => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_int() <= r.as_int()).into());
+                }
 
-                Instr::And =>   { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_bool() && r.as_bool()).into()); }
-                Instr::Or =>    { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_bool() || r.as_bool()).into()); }
-                Instr::BAnd =>  { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((l.as_int() & r.as_int()).into()); }
-                Instr::Match => { let r = mem.pop().unwrap(); let l = mem.pop().unwrap(); mem.push((r.as_re().is_match(l.as_str())).into()); }
-                Instr::Not =>   { let e = mem.pop().unwrap(); mem.push((!e.as_bool()).into()); }
-                Instr::Neg =>   { let e = mem.pop().unwrap(); mem.push((-e.as_int()).into()); }
+                Instr::And => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_bool() && r.as_bool()).into());
+                }
+                Instr::Or => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_bool() || r.as_bool()).into());
+                }
+                Instr::BAnd => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((l.as_int() & r.as_int()).into());
+                }
+                Instr::Match => {
+                    let r = mem.pop().unwrap();
+                    let l = mem.pop().unwrap();
+                    mem.push((r.as_re().is_match(l.as_str())).into());
+                }
+                Instr::Not => {
+                    let e = mem.pop().unwrap();
+                    mem.push((!e.as_bool()).into());
+                }
+                Instr::Neg => {
+                    let e = mem.pop().unwrap();
+                    mem.push((-e.as_int()).into());
+                }
 
-                Instr::Ret => { return mem.pop().unwrap().as_bool(); }
+                Instr::Ret => {
+                    return mem.pop().unwrap().as_bool();
+                }
             }
         }
 

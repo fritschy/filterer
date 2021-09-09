@@ -1,16 +1,15 @@
-use filterer::nom_parser;
-
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+
+use std::fmt::{Display, Formatter};
 use std::io;
 
-use filterer::eval::{Accessor};
+use filterer::{eval::Accessor, machine::Machine, nom_parser};
 
 #[cfg(feature = "pest_parser")]
 pub use filterer::pest_parser;
 #[cfg(feature = "pest_parser")]
 pub use pest::Parser;
-use std::fmt::{Display, Formatter};
 
 struct Message<'a> {
     ts: usize,
@@ -95,7 +94,7 @@ fn messages() -> Vec<Message<'static>> {
 
 fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
-        let c = filterer::machine::Machine::from_node(&x).unwrap();
+        let c = Machine::from_node(&x).unwrap();
 
         if !bench {
             // println!("Got: {:#?}", x.as_ref());

@@ -1,6 +1,6 @@
 use crate::eval::*;
-use crate::nom_parser::parse;
 use crate::machine::Machine;
+use crate::nom_parser::parse;
 use regex::Regex;
 
 type Data<'a> = &'a str;
@@ -34,7 +34,8 @@ impl Accessor for Data<'_> {
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
-        let d = DATA.iter()
+        let d = DATA
+            .iter()
             .filter(|m| p.eval_filter(*m))
             .map(|m| *m)
             .collect::<Vec<_>>();
@@ -45,7 +46,11 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
 
         let machine = Machine::from_node(&p).unwrap();
         println!("Code:\n{}", &machine);
-        let d = DATA.iter().filter(|x| machine.eval(*x)).map(|m|*m).collect::<Vec<_>>();
+        let d = DATA
+            .iter()
+            .filter(|x| machine.eval(*x))
+            .map(|m| *m)
+            .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
         panic!("{}", p);
@@ -59,8 +64,12 @@ fn re(s: &str) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl Accessor for X {
-        fn get_str<'a>(&'a self, _: &str) -> Result<&'a str, String> { Ok("1") }
-        fn get_num(&self, _: &str) -> Result<isize, String> { Ok(1) }
+        fn get_str<'a>(&'a self, _: &str) -> Result<&'a str, String> {
+            Ok("1")
+        }
+        fn get_num(&self, _: &str) -> Result<isize, String> {
+            Ok(1)
+        }
     }
     const DATA0: &X = &X;
     let node = parse(expr).unwrap();
@@ -224,7 +233,8 @@ const DATA2: &[Item] = &[
 
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
-        let d = DATA2.iter()
+        let d = DATA2
+            .iter()
             .filter(|m| p.eval_filter(*m))
             .map(|m| *m)
             .collect::<Vec<_>>();
@@ -236,7 +246,11 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 
         let machine = Machine::from_node(&p).unwrap();
         println!("Code:\n{}", &machine);
-        let d = DATA2.iter().filter(|x| machine.eval(*x)).map(|m|*m).collect::<Vec<_>>();
+        let d = DATA2
+            .iter()
+            .filter(|x| machine.eval(*x))
+            .map(|m| *m)
+            .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
         panic!("{}", p);
@@ -247,5 +261,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 fn comprehensive_data() {
     compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
     compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
-    compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| u & 0x100 != 0 && i < 7);
+    compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
+        u & 0x100 != 0 && i < 7
+    });
 }
