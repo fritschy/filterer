@@ -79,20 +79,6 @@ impl<'a> PartialEq for Value<'a> {
     }
 }
 
-impl<'a> PartialOrd for Value<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.is_re() || other.is_re() {
-            return None;
-        }
-
-        if self.is_nil() || other.is_nil() {
-            return None;
-        }
-
-        self.as_int().partial_cmp(&other.as_int())
-    }
-}
-
 impl<'a> Value<'a> {
     pub fn as_int(&self) -> isize {
         match self {
@@ -187,10 +173,10 @@ impl Eval<&dyn Accessor> for Box<Node> {
                             match op {
                                 BinaryOp::Eq => (l == r).into(),
                                 BinaryOp::Ne => (l != r).into(),
-                                BinaryOp::Ge => (l >= r).into(),
-                                BinaryOp::Gt => (l > r).into(),
-                                BinaryOp::Le => (l <= r).into(),
-                                BinaryOp::Lt => (l < r).into(),
+                                BinaryOp::Ge => (l.as_int() >= r.as_int()).into(),
+                                BinaryOp::Gt => (l.as_int() > r.as_int()).into(),
+                                BinaryOp::Le => (l.as_int() <= r.as_int()).into(),
+                                BinaryOp::Lt => (l.as_int() < r.as_int()).into(),
                                 BinaryOp::Match => (r.re_matches(l.as_str())).into(),
 
                                 BinaryOp::Band => Value::Int(l.as_int() & r.as_int()),

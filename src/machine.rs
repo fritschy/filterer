@@ -171,22 +171,22 @@ impl<'a> Machine<'a> {
                     Instr::Gt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l > r).into());
+                        mem.push((l.as_int() > r.as_int()).into());
                     }
                     Instr::Ge => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l >= r).into());
+                        mem.push((l.as_int() >= r.as_int()).into());
                     }
                     Instr::Lt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l < r).into());
+                        mem.push((l.as_int() < r.as_int()).into());
                     }
                     Instr::Le => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l <= r).into());
+                        mem.push((l.as_int() <= r.as_int()).into());
                     }
 
                     // Yes, there is no short-circuit here...
