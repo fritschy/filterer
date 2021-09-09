@@ -2,7 +2,6 @@
 
 use crate::nom_parser::{self, BinaryOp, Node, UnaryOp};
 use regex::Regex;
-use std::cmp::Ordering;
 
 pub fn parse_num(i: &str) -> isize {
     nom_parser::parse_num(i).unwrap_or(0)
