@@ -31,6 +31,7 @@ redundant and/or just plain inefficient...
 ## Examples
 
 * `ctx =~ /e/ && ((app =~ /HMI/ && ts > 0) || flags & 0x100)`
+* `ctx =~ !/e/`
 * `1`
 * `0`
 * `"0" == 0`

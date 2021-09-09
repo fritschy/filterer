@@ -260,6 +260,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 #[test]
 fn comprehensive_data() {
     compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
+    compare2("s =~ !/[es]/", |&&Item(_, s, _)| !re("[es]").is_match(s));
     compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
         u & 0x100 != 0 && i < 7

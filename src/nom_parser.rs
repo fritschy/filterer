@@ -10,7 +10,9 @@ use nom::{AsChar, Finish, IResult, Offset};
 use std::fmt;
 use std::num::ParseIntError;
 
-#[derive(Debug)]
+use crate::sema;
+
+#[derive(Debug, Clone)]
 pub enum Node {
     Unary {
         op: UnaryOp,
@@ -53,14 +55,14 @@ impl From<&Node> for NodeType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Not, // !A
     Neg, // -A
 }
 
 // Do we need this.... now?
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     Eq, // A == B
     Ne, // A != B
@@ -190,7 +192,9 @@ impl<'a> fmt::Display for ParseError<'a> {
 pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
     match parse_expr(i) {
         Ok((_, o)) => {
-            if let Err(serr) = crate::sema::check(&o) {
+            // FIXME: are transformations supposed to be run before analysis/checks?
+            let o = sema::transform(o);
+            if let Err(serr) = sema::check(&o) {
                 return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr)));
             }
             Ok(o)
