@@ -25,6 +25,7 @@ pub enum Node {
     Constant(isize),
     StringLiteral(String),
     Regexp(regex::Regex),
+    Nil,
 }
 
 #[derive(PartialEq)]
@@ -35,17 +36,19 @@ pub enum NodeType {
     Constant,
     StringLiteral,
     Regexp,
+    Nil,
 }
 
 impl From<&Node> for NodeType {
     fn from(n: &Node) -> Self {
         match n {
             Node::Unary { .. } => NodeType::Unary,
-            Node::Binary { .. } => NodeType::Unary,
+            Node::Binary { .. } => NodeType::Binary,
             Node::Identifier(_) => NodeType::Identifier,
             Node::Constant(_) => NodeType::Constant,
             Node::StringLiteral(_) => NodeType::StringLiteral,
             Node::Regexp(_) => NodeType::Regexp,
+            Node::Nil => NodeType::Nil,
         }
     }
 }
@@ -137,7 +140,7 @@ impl Node {
         if let Ok(re) = regex::Regex::new(i) {
             Box::new(Node::Regexp(re))
         } else {
-            Box::new(Node::Regexp(regex::Regex::new("$.").unwrap()))
+            Box::new(Node::Nil)
         }
     }
 

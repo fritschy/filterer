@@ -5,7 +5,7 @@ pub fn check(node: &Node) -> Result<(), String> {
         match node {
             Node::Binary { lhs, op, rhs } => match op {
                 BinaryOp::Match => {
-                    if rhs.get_type() != NodeType::Regexp {
+                    if rhs.get_type() != NodeType::Regexp && rhs.get_type() != NodeType::Nil {
                         return Err("Match operator needs a right regex argument".to_string());
                     }
                     if lhs.get_type() != NodeType::Identifier
@@ -30,10 +30,11 @@ pub fn check(node: &Node) -> Result<(), String> {
                 }
                 walk(expr)?;
             }
-            Node::Constant(_num) => {}
-            Node::StringLiteral(_s) => {}
-            Node::Identifier(_ident) => {}
-            Node::Regexp(_re) => {}
+            Node::Constant(_num) => (),
+            Node::StringLiteral(_s) => (),
+            Node::Identifier(_ident) => (),
+            Node::Regexp(_re) => (),
+            Node::Nil => (),
         }
         Ok(())
     }

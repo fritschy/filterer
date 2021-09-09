@@ -2,6 +2,7 @@
 
 use crate::nom_parser::{self, BinaryOp, Node, UnaryOp};
 use regex::Regex;
+use std::cmp::Ordering;
 
 pub fn parse_num(i: &str) -> isize {
     nom_parser::parse_num(i).unwrap_or(0)
@@ -27,6 +28,7 @@ pub enum Value<'a> {
     Int(isize),
     Str(&'a str),
     Re(&'a Regex),
+    Nil,
 }
 
 impl<'a> From<bool> for Value<'a> {
@@ -48,6 +50,10 @@ impl<'a> From<isize> for Value<'a> {
 impl<'a> PartialEq for Value<'a> {
     fn eq(&self, other: &Self) -> bool {
         if self.is_re() || other.is_re() {
+            return false;
+        }
+
+        if self.is_nil() || other.is_nil() {
             return false;
         }
 
@@ -73,11 +79,26 @@ impl<'a> PartialEq for Value<'a> {
     }
 }
 
+impl<'a> PartialOrd for Value<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.is_re() || other.is_re() {
+            return None;
+        }
+
+        if self.is_nil() || other.is_nil() {
+            return None;
+        }
+
+        self.as_int().partial_cmp(&other.as_int())
+    }
+}
+
 impl<'a> Value<'a> {
     pub fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
             Value::Str(x) => parse_num(*x),
+            Value::Nil => 0,
             _ => panic!("as_int() needs to be a number"),
         }
     }
@@ -95,6 +116,7 @@ impl<'a> Value<'a> {
             Value::Str(s) => *s,
             Value::Int(0) | Value::Re(_) => "0",
             Value::Int(_) => "1",
+            Value::Nil => "0",
         }
     }
 
@@ -102,6 +124,13 @@ impl<'a> Value<'a> {
         match self {
             Value::Re(r) => *r,
             _ => panic!("Not an re"),
+        }
+    }
+
+    pub fn re_matches(&self, other: &str) -> bool {
+        match self {
+            Value::Re(r) => r.is_match(other),
+            _ => false,
         }
     }
 
@@ -115,6 +144,10 @@ impl<'a> Value<'a> {
 
     pub fn is_re(&self) -> bool {
         matches!(self, Value::Re(_))
+    }
+
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Value::Nil)
     }
 }
 
@@ -132,6 +165,7 @@ fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
             }
         }
         Node::Regexp(re) => Some(Value::Re(re)),
+        Node::Nil => Some(Value::Nil),
         _ => unreachable!(),
     }
 }
@@ -153,11 +187,11 @@ impl Eval<&dyn Accessor> for Box<Node> {
                             match op {
                                 BinaryOp::Eq => (l == r).into(),
                                 BinaryOp::Ne => (l != r).into(),
-                                BinaryOp::Ge => (l.as_int() >= r.as_int()).into(),
-                                BinaryOp::Gt => (l.as_int() > r.as_int()).into(),
-                                BinaryOp::Le => (l.as_int() <= r.as_int()).into(),
-                                BinaryOp::Lt => (l.as_int() < r.as_int()).into(),
-                                BinaryOp::Match => (r.as_re().is_match(l.as_str())).into(),
+                                BinaryOp::Ge => (l >= r).into(),
+                                BinaryOp::Gt => (l > r).into(),
+                                BinaryOp::Le => (l <= r).into(),
+                                BinaryOp::Lt => (l < r).into(),
+                                BinaryOp::Match => (r.re_matches(l.as_str())).into(),
 
                                 BinaryOp::Band => Value::Int(l.as_int() & r.as_int()),
                                 BinaryOp::Or | BinaryOp::And => unreachable!(),

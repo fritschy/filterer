@@ -10,6 +10,7 @@ pub enum Instr<'a> {
     LoadString(&'a str),
     LoadNum(isize),
     LoadRe(&'a Regex),
+    LoadNil,
     And,
     Or,
     Eq,
@@ -34,6 +35,7 @@ impl Display for Instr<'_> {
                 Instr::LoadString(x) => format!("load string \"{}\"", x),
                 Instr::LoadNum(x) => format!("load num {}", x),
                 Instr::LoadRe(x) => format!("load re /{:?}/", x),
+                Instr::LoadNil => "load nil".into(),
                 Instr::And => "and".into(),
                 Instr::Or => "or".into(),
                 Instr::Eq => "eq".into(),
@@ -84,6 +86,7 @@ impl<'a> From<&'a Node> for Instr<'a> {
             Node::Identifier(s) => Instr::LoadIdent(s),
             Node::Constant(i) => Instr::LoadNum(*i),
             Node::Regexp(r) => Instr::LoadRe(r),
+            Node::Nil => Instr::LoadNil,
             _ => unreachable!(),
         }
     }
@@ -149,13 +152,14 @@ impl<'a> Machine<'a> {
                         } else if a.is_str(x) {
                             mem.push(Value::Str(a.get_str(x).ok()?))
                         } else {
-                            mem.push(Value::Int(0))
+                            mem.push(Value::Nil)
                         }
                     }
 
                     Instr::LoadString(x) => mem.push(Value::Str(x)),
                     Instr::LoadNum(x) => mem.push(Value::Int(x)),
                     Instr::LoadRe(x) => mem.push(Value::Re(x)),
+                    Instr::LoadNil => mem.push(Value::Nil),
 
                     Instr::Eq => {
                         let r = mem.pop()?;
@@ -171,22 +175,22 @@ impl<'a> Machine<'a> {
                     Instr::Gt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() > r.as_int()).into());
+                        mem.push((l > r).into());
                     }
                     Instr::Ge => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() >= r.as_int()).into());
+                        mem.push((l >= r).into());
                     }
                     Instr::Lt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() < r.as_int()).into());
+                        mem.push((l < r).into());
                     }
                     Instr::Le => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() <= r.as_int()).into());
+                        mem.push((l <= r).into());
                     }
 
                     // Yes, there is no short-circuit here...
@@ -209,7 +213,7 @@ impl<'a> Machine<'a> {
                     Instr::Match => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((r.as_re().is_match(l.as_str())).into());
+                        mem.push((r.re_matches(l.as_str())).into());
                     }
 
                     Instr::Not => {
