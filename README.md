@@ -46,7 +46,7 @@ For more examples check the tests and main
   its introduction provides).
 
 ## Grammar
-I used [pest](https://pest.io/) to prototype the grammar, so this is what
+I used [pest](https://pest.rs/) to prototype the grammar, so this is what
 I followed *mostly*. I opted to make whitespaces explicit, as there are
 places they should not just be skipped/accepted:
 
