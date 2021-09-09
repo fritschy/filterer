@@ -197,6 +197,7 @@ impl<'a> Machine<'a> {
                     mem.push((l.as_int() <= r.as_int()).into());
                 }
 
+                // Yes, there is no short-circuit here...
                 Instr::And => {
                     let r = mem.pop().unwrap();
                     let l = mem.pop().unwrap();
@@ -207,6 +208,7 @@ impl<'a> Machine<'a> {
                     let l = mem.pop().unwrap();
                     mem.push((l.as_bool() || r.as_bool()).into());
                 }
+
                 Instr::BAnd => {
                     let r = mem.pop().unwrap();
                     let l = mem.pop().unwrap();
@@ -217,6 +219,7 @@ impl<'a> Machine<'a> {
                     let l = mem.pop().unwrap();
                     mem.push((r.as_re().is_match(l.as_str())).into());
                 }
+
                 Instr::Not => {
                     let e = mem.pop().unwrap();
                     mem.push((!e.as_bool()).into());
