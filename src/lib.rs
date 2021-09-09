@@ -22,8 +22,4 @@ pub mod machine;
 mod tests;
 
 #[cfg(feature = "pest_parser")]
-pub mod pest_parser {
-    #[derive(pest_derive::Parser, Debug, Clone)]
-    #[grammar = "filter.pest"]
-    pub struct Filter;
-}
+pub mod pest_parser;
