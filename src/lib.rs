@@ -19,6 +19,3 @@ pub mod sema;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(feature = "pest_parser")]
-pub mod pest_parser;

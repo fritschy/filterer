@@ -6,11 +6,6 @@ use std::io;
 
 use filterer::{eval::Accessor, machine::Machine, nom_parser};
 
-#[cfg(feature = "pest_parser")]
-pub use filterer::pest_parser;
-#[cfg(feature = "pest_parser")]
-pub use pest::Parser;
-
 struct Message<'a> {
     ts: usize,
     flags: usize,
@@ -118,15 +113,6 @@ fn doit(l: &str, bench: bool) {
         println!("matched {}/{} messages", count, messages().len());
     }) {
         eprintln!("{}", e);
-    }
-
-    #[cfg(feature = "pest_parser")]
-    {
-        if let Err(e) = pest_parser::Filter::parse(pest_parser::Rule::expr, l.trim()).map(|x| {
-            println!("pest_parser, Got: {}", x);
-        }) {
-            eprintln!("Got error: {:?}", e);
-        }
     }
 }
 

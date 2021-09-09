@@ -81,7 +81,7 @@ pub fn transform(node: Box<Node>) -> Box<Node> {
                 })
             }
 
-            x => Box::new(x.clone()),
+            _ => node,
         }
     }
 
