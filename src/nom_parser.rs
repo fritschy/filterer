@@ -210,7 +210,7 @@ pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
 }
 
 // parse_expr = { SOI ~ simple_expr ~ ws* ~ EOI }
-pub fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
     let (i, e) = simple_expr(i)?;
     let (i, _) = multispace0(i)?;
     let (i, _) = eof(i)?;

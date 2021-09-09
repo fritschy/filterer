@@ -22,8 +22,6 @@ struct Message<'a> {
 mod sw;
 use sw::Stopwatch;
 
-mod eval;
-
 impl<'a> Display for Message<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(

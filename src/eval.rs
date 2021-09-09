@@ -1,10 +1,10 @@
 // quick and hacked implementation of an expression evaluation
 
-use crate::nom_parser::{BinaryOp, Node, UnaryOp};
+use crate::nom_parser::{self, BinaryOp, Node, UnaryOp};
 use regex::Regex;
 
 pub fn parse_num(i: &str) -> isize {
-    crate::nom_parser::parse_num(i).unwrap_or(0)
+    nom_parser::parse_num(i).unwrap_or(0)
 }
 
 pub trait Accessor {

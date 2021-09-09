@@ -5,7 +5,6 @@ use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug)]
 pub enum Instr<'a> {
     LoadIdent(&'a str),
     LoadString(&'a str),
@@ -138,11 +137,6 @@ impl<'a> Machine<'a> {
     }
 
     pub fn eval(&self, a: &'a dyn Accessor) -> bool {
-        // let mut memp = self.mem.borrow_mut();
-        // memp.reserve(self.instr.len()); // too much, still...
-
-        // let mut mem = unsafe { Vec::from_raw_parts(memp.as_mut_ptr(), memp.len(), memp.capacity()) };
-
         fn eval_<'a>(mach: &Machine<'a>, a: &'a dyn Accessor) -> Option<bool> {
             let mut mem = mach.mem.borrow_mut();
             mem.clear();
