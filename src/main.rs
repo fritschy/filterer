@@ -4,7 +4,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::io;
 
-use filterer::eval::{Accessor, Eval};
+use filterer::eval::{Accessor};
 
 #[cfg(feature = "pest_parser")]
 pub use filterer::pest_parser;
@@ -22,6 +22,8 @@ struct Message<'a> {
 
 mod sw;
 use sw::Stopwatch;
+
+mod eval;
 
 impl<'a> Display for Message<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -93,14 +95,21 @@ fn messages() -> Vec<Message<'static>> {
 
 fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
+        let c = filterer::machine::Machine::from_node(&x).unwrap();
+
         if !bench {
-            println!("Got: {:#?}", x.as_ref());
+            // println!("Got: {:#?}", x.as_ref());
+            println!("Code:\n{}", c);
         }
+
         let mut count = 0;
         let max = if bench { 1_000_000 } else { 1 };
+        let msgs = messages();
         for _i in 0..max {
-            for m in messages().iter() {
-                if x.eval_filter(m) {
+            for m in msgs.iter() {
+                //println!("CodeEval: {}", c.eval(m));
+                //if x.eval_filter(m) {
+                if c.eval(m) {
                     count += 1;
                     if !bench {
                         println!("{}", m);

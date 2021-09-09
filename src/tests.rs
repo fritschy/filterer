@@ -1,5 +1,6 @@
 use crate::eval::*;
 use crate::nom_parser::parse;
+use crate::machine::Machine;
 use regex::Regex;
 
 type Data<'a> = &'a str;
@@ -39,10 +40,13 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
             .collect::<Vec<_>>();
         println!("(compare) Selected: {:?}", &d);
 
-        assert_eq!(
-            d,
-            DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>()
-        );
+        let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
+        assert_eq!(d, expect);
+
+        let machine = Machine::from_node(&p).unwrap();
+        println!("Code:\n{}", &machine);
+        let d = DATA.iter().filter(|x| machine.eval(*x)).map(|m|*m).collect::<Vec<_>>();
+        assert_eq!(d, expect);
     }) {
         panic!("{}", p);
     }
@@ -59,7 +63,11 @@ fn check(expr: &str, exp: bool) {
         fn get_num(&self, _: &str) -> Result<isize, String> { Ok(1) }
     }
     const DATA0: &X = &X;
-    assert!(parse(expr).unwrap().eval_filter(DATA0) == exp);
+    let node = parse(expr).unwrap();
+    assert!(node.eval_filter(DATA0) == exp);
+    let machine = Machine::from_node(&node).unwrap();
+    println!("Code:\n{}", &machine);
+    assert!(machine.eval(DATA0) == exp);
 }
 
 #[test]
@@ -223,10 +231,13 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 
         println!("(compare2) Selected: {:?}", &d);
 
-        assert_eq!(
-            d,
-            DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>()
-        );
+        let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
+        assert_eq!(d, expect);
+
+        let machine = Machine::from_node(&p).unwrap();
+        println!("Code:\n{}", &machine);
+        let d = DATA2.iter().filter(|x| machine.eval(*x)).map(|m|*m).collect::<Vec<_>>();
+        assert_eq!(d, expect);
     }) {
         panic!("{}", p);
     }

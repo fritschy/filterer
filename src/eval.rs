@@ -10,13 +10,16 @@ pub fn parse_num(i: &str) -> isize {
 pub trait Accessor {
     fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String>;
     fn get_num(&self, k: &str) -> Result<isize, String>;
+
+    fn is_int(&self, k: &str) -> bool { matches!(self.get_num(k), Ok(_)) }
+    fn is_str(&self, k: &str) -> bool { matches!(self.get_str(k), Ok(_)) }
 }
 
 pub trait Eval<T> {
     fn eval_filter(&self, e: T) -> bool;
 }
 
-enum Value<'a> {
+pub enum Value<'a> {
     Int(isize),
     Str(&'a str),
     Re(&'a Regex),
@@ -29,6 +32,12 @@ impl<'a> From<bool> for Value<'a> {
         } else {
             Self::Int(0)
         }
+    }
+}
+
+impl<'a> From<isize> for Value<'a> {
+    fn from(b: isize) -> Self {
+        Self::Int(b)
     }
 }
 
@@ -61,7 +70,7 @@ impl<'a> PartialEq for Value<'a> {
 }
 
 impl<'a> Value<'a> {
-    fn as_int(&self) -> isize {
+    pub fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
             Value::Str(x) => parse_num(*x),
@@ -69,7 +78,7 @@ impl<'a> Value<'a> {
         }
     }
 
-    fn as_bool(&self) -> bool {
+    pub fn as_bool(&self) -> bool {
         match self {
             Value::Int(x) => *x != 0,
             Value::Str(s) => *s != "0",
@@ -77,7 +86,7 @@ impl<'a> Value<'a> {
         }
     }
 
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Value::Str(s) => *s,
             Value::Int(0) | Value::Re(_) => "0",
@@ -85,22 +94,22 @@ impl<'a> Value<'a> {
         }
     }
 
-    fn as_re(&self) -> &Regex {
+    pub fn as_re(&self) -> &Regex {
         match self {
             Value::Re(r) => *r,
             _ => panic!("Not an re"),
         }
     }
 
-    fn is_int(&self) -> bool {
+    pub fn is_int(&self) -> bool {
         matches!(self, Value::Int(_))
     }
 
-    fn is_str(&self) -> bool {
+    pub fn is_str(&self) -> bool {
         matches!(self, Value::Str(_))
     }
 
-    fn is_re(&self) -> bool {
+    pub fn is_re(&self) -> bool {
         matches!(self, Value::Re(_))
     }
 }
