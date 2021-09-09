@@ -27,29 +27,25 @@ pub enum Instr<'a> {
 
 impl Display for Instr<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Instr::LoadIdent(x) => format!("load ident {}", x),
-                Instr::LoadString(x) => format!("load string \"{}\"", x),
-                Instr::LoadNum(x) => format!("load num {}", x),
-                Instr::LoadRe(x) => format!("load re /{:?}/", x),
-                Instr::LoadNil => "load nil".into(),
-                Instr::And => "and".into(),
-                Instr::Or => "or".into(),
-                Instr::Eq => "eq".into(),
-                Instr::Ne => "ne".into(),
-                Instr::Lt => "lt".into(),
-                Instr::Le => "le".into(),
-                Instr::Gt => "gt".into(),
-                Instr::Ge => "ge".into(),
-                Instr::BAnd => "band".into(),
-                Instr::Match => "match".into(),
-                Instr::Not => "not".into(),
-                Instr::Neg => "neg".into(),
-            }
-        )
+        match self {
+            Instr::LoadIdent(x) => write!(f, "load ident {}", x),
+            Instr::LoadString(x) => write!(f, "load string \"{}\"", x),
+            Instr::LoadNum(x) => write!(f, "load num {}", x),
+            Instr::LoadRe(x) => write!(f, "load re /{:?}/", x),
+            Instr::LoadNil => write!(f, "load nil"),
+            Instr::And => write!(f, "and"),
+            Instr::Or => write!(f, "or"),
+            Instr::Eq => write!(f, "eq"),
+            Instr::Ne => write!(f, "ne"),
+            Instr::Lt => write!(f, "lt"),
+            Instr::Le => write!(f, "le"),
+            Instr::Gt => write!(f, "gt"),
+            Instr::Ge => write!(f, "ge"),
+            Instr::BAnd => write!(f, "band"),
+            Instr::Match => write!(f, "match"),
+            Instr::Not => write!(f, "not"),
+            Instr::Neg => write!(f, "neg"),
+        }
     }
 }
 
