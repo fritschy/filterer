@@ -12,10 +12,11 @@
 //
 // How to implement chaining of logic operators, i.e. EXPR && EXPR?
 
+mod sema;
+
 pub mod eval;
+pub mod parser;
 pub mod machine;
-pub mod nom_parser;
-pub mod sema;
 
 #[cfg(test)]
 mod tests;

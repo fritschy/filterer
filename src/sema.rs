@@ -1,4 +1,4 @@
-use crate::nom_parser::{BinaryOp, Node, NodeType, UnaryOp};
+use crate::parser::{BinaryOp, Node, NodeType, UnaryOp};
 use std::rc::Rc;
 
 pub fn check(node: &Node) -> Result<(), String> {

@@ -1,24 +1,22 @@
 // quick and hacked implementation of an expression evaluation
 
-use crate::nom_parser;
+use crate::parser;
 use regex::Regex;
 use std::rc::Rc;
 
 pub fn parse_num(i: &str) -> isize {
-    nom_parser::parse_num(i).unwrap_or(0)
+    parser::parse_num(i).unwrap_or(0)
 }
 
-pub struct NoSuchKey<'a>(pub &'a str);
-
 pub trait Accessor {
-    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>>;
-    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>>;
+    fn get_str<'a>(&self, k: &'a str) -> Option<Rc<String>>;
+    fn get_num<'a>(&self, k: &'a str) -> Option<isize>;
 
     fn is_int(&self, k: &str) -> bool {
-        matches!(self.get_num(k), Ok(_))
+        matches!(self.get_num(k), Some(_))
     }
     fn is_str(&self, k: &str) -> bool {
-        matches!(self.get_str(k), Ok(_))
+        matches!(self.get_str(k), Some(_))
     }
 }
 

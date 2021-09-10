@@ -1,6 +1,6 @@
 use crate::eval::*;
 use crate::machine::Machine;
-use crate::nom_parser::parse;
+use crate::parser::parse;
 use regex::Regex;
 use std::rc::Rc;
 
@@ -19,16 +19,16 @@ const DATA: &[Data] = &[
 ];
 
 impl Accessor for Data {
-    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
+    fn get_str(&self, k: &str) -> Option<Rc<String>> {
         if k == "d" {
-            Ok(Rc::new(String::from(*self)))
+            Some(Rc::new(String::from(*self)))
         } else {
-            Err(NoSuchKey(k))
+            None
         }
     }
 
-    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
-        Err(NoSuchKey(k))
+    fn get_num(&self, _: &str) -> Option<isize> {
+        None
     }
 }
 
@@ -57,11 +57,11 @@ fn re(s: &str) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl Accessor for X {
-        fn get_str<'a>(&'a self, _: &str) -> Result<Rc<String>, NoSuchKey<'static>> {
-            Ok(Rc::new(String::from("1")))
+        fn get_str(&self, _: &str) -> Option<Rc<String>> {
+            Some(Rc::new(String::from("1")))
         }
-        fn get_num(&self, _: &str) -> Result<isize, NoSuchKey<'static>> {
-            Ok(1)
+        fn get_num(&self, _: &str) -> Option<isize> {
+            Some(1)
         }
     }
     const DATA0: X = X;
@@ -195,18 +195,18 @@ fn mixing_types() {
 struct Item(isize, &'static str, isize);
 
 impl Accessor for &Item {
-    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
+    fn get_str(&self, k: &str) -> Option<Rc<String>> {
         match k {
-            "s" => Ok(Rc::new(String::from(self.1))),
-            _ => Err(NoSuchKey(k)),
+            "s" => Some(Rc::new(String::from(self.1))),
+            _ => None,
         }
     }
 
-    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
+    fn get_num(&self, k: &str) -> Option<isize> {
         match k {
-            "i" => Ok(self.0),
-            "u" => Ok(self.2),
-            _ => Err(NoSuchKey(k)),
+            "i" => Some(self.0),
+            "u" => Some(self.2),
+            _ => None,
         }
     }
 }

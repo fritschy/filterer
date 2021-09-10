@@ -6,7 +6,7 @@ use std::io;
 
 use std::rc::Rc;
 
-use filterer::{eval::Accessor, machine::Machine, nom_parser};
+use filterer::{eval::Accessor, machine::Machine, parser};
 
 #[derive(Clone)]
 struct Message {
@@ -19,7 +19,6 @@ struct Message {
 
 mod sw;
 use sw::Stopwatch;
-use filterer::eval::NoSuchKey;
 
 impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -32,20 +31,20 @@ impl Display for Message {
 }
 
 impl Accessor for Message {
-    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
-        Ok(match k {
-            "ctx" => self.ctx.clone(),
-            "app" => self.app.clone(),
-            _ => return Err(NoSuchKey(k)),
-        })
+    fn get_str(&self, k: &str) -> Option<Rc<String>> {
+        match k {
+            "ctx" => Some(self.ctx.clone()),
+            "app" => Some(self.app.clone()),
+            _ => return None,
+        }
     }
-    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
-        Ok(match k {
-            "flags" => self.flags as isize,
-            "ts" => self.ts as isize,
-            "level" => self.level as isize,
-            _ => return Err(NoSuchKey(k)),
-        })
+    fn get_num(&self, k: &str) -> Option<isize> {
+        match k {
+            "flags" => Some(self.flags as isize),
+            "ts" => Some(self.ts as isize),
+            "level" => Some(self.level as isize),
+            _ => None,
+        }
     }
 }
 
@@ -90,7 +89,7 @@ fn messages() -> Vec<Rc<Message>> {
 }
 
 fn doit(l: &str, bench: bool) {
-    if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
+    if let Err(e) = parser::parse(l.trim()).map(|x| {
         let c = Machine::from_node(x).unwrap();
 
         if !bench {

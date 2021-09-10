@@ -1,5 +1,5 @@
 use crate::eval::{Accessor, Value};
-use crate::nom_parser::{BinaryOp, Node, UnaryOp};
+use crate::parser::{BinaryOp, Node, UnaryOp};
 
 use regex::Regex;
 use std::cell::RefCell;
@@ -145,9 +145,9 @@ impl Machine {
                 match i {
                     Instr::LoadIdent(x) => {
                         if a.is_int(x) {
-                            mem.push(Value::Int(a.get_num(x).ok()?))
+                            mem.push(Value::Int(a.get_num(x)?))
                         } else if a.is_str(x) {
-                            mem.push(Value::Str(a.get_str(x).ok()?))
+                            mem.push(Value::Str(a.get_str(x)?))
                         } else {
                             mem.push(Value::Nil)
                         }
