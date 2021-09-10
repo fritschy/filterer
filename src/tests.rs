@@ -19,16 +19,16 @@ const DATA: &[Data] = &[
 ];
 
 impl Accessor for Data {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
+    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
         if k == "d" {
             Ok(Rc::new(String::from(*self)))
         } else {
-            Err("Unknown identifier".to_string())
+            Err(NoSuchKey(k))
         }
     }
 
-    fn get_num(&self, _k: &str) -> Result<isize, String> {
-        Err("No such number".to_string())
+    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
+        Err(NoSuchKey(k))
     }
 }
 
@@ -57,10 +57,10 @@ fn re(s: &str) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl Accessor for X {
-        fn get_str<'a>(&'a self, _: &str) -> Result<Rc<String>, String> {
+        fn get_str<'a>(&'a self, _: &str) -> Result<Rc<String>, NoSuchKey<'static>> {
             Ok(Rc::new(String::from("1")))
         }
-        fn get_num(&self, _: &str) -> Result<isize, String> {
+        fn get_num(&self, _: &str) -> Result<isize, NoSuchKey<'static>> {
             Ok(1)
         }
     }
@@ -195,18 +195,18 @@ fn mixing_types() {
 struct Item(isize, &'static str, isize);
 
 impl Accessor for &Item {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
+    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
         match k {
             "s" => Ok(Rc::new(String::from(self.1))),
-            _ => Err(format!("No such key: {}", k)),
+            _ => Err(NoSuchKey(k)),
         }
     }
 
-    fn get_num(&self, k: &str) -> Result<isize, String> {
+    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
         match k {
             "i" => Ok(self.0),
             "u" => Ok(self.2),
-            _ => Err(format!("No such key: {}", k)),
+            _ => Err(NoSuchKey(k)),
         }
     }
 }

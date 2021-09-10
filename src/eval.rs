@@ -8,9 +8,11 @@ pub fn parse_num(i: &str) -> isize {
     nom_parser::parse_num(i).unwrap_or(0)
 }
 
+pub struct NoSuchKey<'a>(pub &'a str);
+
 pub trait Accessor {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, &'static str>;
-    fn get_num(&self, k: &str) -> Result<isize, &'static str>;
+    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>>;
+    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>>;
 
     fn is_int(&self, k: &str) -> bool {
         matches!(self.get_num(k), Ok(_))

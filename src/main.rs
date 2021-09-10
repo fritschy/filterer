@@ -19,6 +19,7 @@ struct Message {
 
 mod sw;
 use sw::Stopwatch;
+use filterer::eval::NoSuchKey;
 
 impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -31,19 +32,19 @@ impl Display for Message {
 }
 
 impl Accessor for Message {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, &'static str> {
+    fn get_str<'a>(&self, k: &'a str) -> Result<Rc<String>, NoSuchKey<'a>> {
         Ok(match k {
             "ctx" => self.ctx.clone(),
             "app" => self.app.clone(),
-            _ => return Err("No such str"),
+            _ => return Err(NoSuchKey(k)),
         })
     }
-    fn get_num(&self, k: &str) -> Result<isize, &'static str> {
+    fn get_num<'a>(&self, k: &'a str) -> Result<isize, NoSuchKey<'a>> {
         Ok(match k {
             "flags" => self.flags as isize,
             "ts" => self.ts as isize,
             "level" => self.level as isize,
-            _ => return Err("No such num"),
+            _ => return Err(NoSuchKey(k)),
         })
     }
 }
