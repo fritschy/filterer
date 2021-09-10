@@ -64,7 +64,6 @@ pub fn transform(node: Rc<Node>) -> Rc<Node> {
         match node.as_ref() {
             Node::Binary {lhs, op, rhs} => {
                 if let Some(node) = transform_match_not_regex(node.clone()) {
-                    dbg!(&node);
                     return node;
                 }
 
