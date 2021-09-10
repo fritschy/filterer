@@ -35,15 +35,7 @@ impl Accessor for Data {
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
-        let d = DATA
-            .iter()
-            .filter(|m| p.eval_filter(*m))
-            .map(|m| *m)
-            .collect::<Vec<_>>();
-        println!("(compare) Selected: {:?}", &d);
-
         let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
-        assert_eq!(d, expect);
 
         let machine = Machine::from_node(p).unwrap();
         println!("Code:\n{}", &machine);
@@ -74,7 +66,6 @@ fn check(expr: &str, exp: bool) {
     }
     const DATA0: X = X;
     let node = parse(expr).unwrap();
-    assert!(node.eval_filter(&DATA0) == exp);
     let machine = Machine::from_node(node).unwrap();
     println!("Code:\n{}", &machine);
     assert!(machine.eval(Rc::new(DATA0)) == exp);
@@ -234,16 +225,7 @@ const DATA2: &[Item] = &[
 
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
-        let d = DATA2
-            .iter()
-            .filter(|m| p.eval_filter(m))
-            .map(|m| *m)
-            .collect::<Vec<_>>();
-
-        println!("(compare2) Selected: {:?}", &d);
-
         let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
-        assert_eq!(d, expect);
 
         let machine = Machine::from_node(p).unwrap();
         println!("Code:\n{}", &machine);

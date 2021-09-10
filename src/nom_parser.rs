@@ -17,12 +17,12 @@ use std::rc::Rc;
 pub enum Node {
     Unary {
         op: UnaryOp,
-        expr: Box<Node>,
+        expr: Rc<Node>,
     },
     Binary {
-        lhs: Box<Node>,
+        lhs: Rc<Node>,
         op: BinaryOp,
-        rhs: Box<Node>,
+        rhs: Rc<Node>,
     },
     Identifier(Rc<String>),
     Constant(isize),
@@ -123,36 +123,36 @@ pub fn parse_num(i: &str) -> Result<isize, ParseIntError> {
 }
 
 impl Node {
-    fn from_identifier(i: Input) -> Box<Node> {
-        Box::new(Node::Identifier(Rc::new(i.to_string())))
+    fn from_identifier(i: Input) -> Rc<Node> {
+        Rc::new(Node::Identifier(Rc::new(i.to_string())))
     }
 
-    fn from_numeric(i: Input) -> Box<Node> {
+    fn from_numeric(i: Input) -> Rc<Node> {
         if let Ok(num) = parse_num(i) {
-            Box::new(Node::Constant(num))
+            Rc::new(Node::Constant(num))
         } else {
-            Box::new(Node::Constant(0))
+            Rc::new(Node::Constant(0))
         }
     }
 
-    fn from_string(i: Input) -> Box<Node> {
-        Box::new(Node::StringLiteral(Rc::new(i.to_string())))
+    fn from_string(i: Input) -> Rc<Node> {
+        Rc::new(Node::StringLiteral(Rc::new(i.to_string())))
     }
 
-    fn from_regexp(i: Input) -> Box<Node> {
+    fn from_regexp(i: Input) -> Rc<Node> {
         if let Ok(re) = regex::Regex::new(i) {
-            Box::new(Node::Regexp(Rc::new(re)))
+            Rc::new(Node::Regexp(Rc::new(re)))
         } else {
-            Box::new(Node::Nil)
+            Rc::new(Node::Nil)
         }
     }
 
-    fn new_binary(lhs: Box<Node>, op: BinaryOp, rhs: Box<Node>) -> Box<Node> {
-        Box::new(Node::Binary { lhs, op, rhs })
+    fn new_binary(lhs: Rc<Node>, op: BinaryOp, rhs: Rc<Node>) -> Rc<Node> {
+        Rc::new(Node::Binary { lhs, op, rhs })
     }
 
-    fn new_unary(op: UnaryOp, expr: Box<Node>) -> Box<Node> {
-        Box::new(Node::Unary { op, expr })
+    fn new_unary(op: UnaryOp, expr: Rc<Node>) -> Rc<Node> {
+        Rc::new(Node::Unary { op, expr })
     }
 
     pub(crate) fn get_type(&self) -> NodeType {
@@ -190,7 +190,7 @@ impl<'a> fmt::Display for ParseError<'a> {
     }
 }
 
-pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
+pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?
@@ -218,7 +218,7 @@ pub fn parse(i: Input) -> Result<Box<Node>, ParseError> {
 }
 
 // parse_expr = { SOI ~ simple_expr ~ ws* ~ EOI }
-fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn parse_expr(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, e) = simple_expr(i)?;
     let (i, _) = multispace0(i)?;
     let (i, _) = eof(i)?;
@@ -228,9 +228,9 @@ fn parse_expr(i: Input) -> IResult<Input, Box<Node>> {
 // generic_expr = { ws* ~ nextp ~ (ws* ~ opp ~ generic_expr ~ ws*)? }
 fn generic_expr<'a>(
     opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
-    nextp: &impl Fn(Input) -> IResult<Input, Box<Node>>,
+    nextp: &impl Fn(Input) -> IResult<Input, Rc<Node>>,
     i: &'a str,
-) -> IResult<&'a str, Box<Node>> {
+) -> IResult<&'a str, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, ae) = nextp(i)?;
     let (i, on) = opt(move |i| {
@@ -249,7 +249,7 @@ fn generic_expr<'a>(
     }
 }
 
-fn simple_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn simple_expr(i: Input) -> IResult<Input, Rc<Node>> {
     generic_expr(
         &mut move |i| map(tag("||"), BinaryOp::from)(i),
         &move |i| and_expr(i),
@@ -257,7 +257,7 @@ fn simple_expr(i: Input) -> IResult<Input, Box<Node>> {
     )
 }
 
-fn and_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn and_expr(i: Input) -> IResult<Input, Rc<Node>> {
     generic_expr(
         &mut move |i| map(tag("&&"), BinaryOp::from)(i),
         &move |i| rel_expr(i),
@@ -265,7 +265,7 @@ fn and_expr(i: Input) -> IResult<Input, Box<Node>> {
     )
 }
 
-fn rel_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn rel_expr(i: Input) -> IResult<Input, Rc<Node>> {
     generic_expr(
         &mut move |i| map(relop, BinaryOp::from)(i),
         &move |i| sum_expr(i),
@@ -273,7 +273,7 @@ fn rel_expr(i: Input) -> IResult<Input, Box<Node>> {
     )
 }
 
-fn sum_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn sum_expr(i: Input) -> IResult<Input, Rc<Node>> {
     generic_expr(
         &mut move |i| map(tag("&"), BinaryOp::from)(i),
         &move |i| unary_expr(i),
@@ -282,7 +282,7 @@ fn sum_expr(i: Input) -> IResult<Input, Box<Node>> {
 }
 
 // unary_expr = { ws* ~ ("!" | "-")? ~ factor }
-fn unary_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn unary_expr(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, op) = opt(map(alt((tag("!"), tag("-"))), UnaryOp::from))(i)?;
     let (i, ue) = factor(i)?;
@@ -295,7 +295,7 @@ fn unary_expr(i: Input) -> IResult<Input, Box<Node>> {
 }
 
 // factor = { ws* ~ (identifier | numeric | string | parens_expr) }
-fn factor(i: Input) -> IResult<Input, Box<Node>> {
+fn factor(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     alt((
         identifier,
@@ -309,8 +309,8 @@ fn factor(i: Input) -> IResult<Input, Box<Node>> {
 // FIXME: this one sucks particularly HARD
 fn string<'a>(
     delimiter: Input<'a>,
-    map_to: &'a impl Fn(Input) -> Box<Node>,
-) -> impl Fn(Input) -> IResult<Input, Box<Node>> + 'a {
+    map_to: &'a impl Fn(Input) -> Rc<Node>,
+) -> impl Fn(Input) -> IResult<Input, Rc<Node>> + 'a {
     move |i| {
         map(
             delimited(
@@ -353,7 +353,7 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
 }
 
 // parens_expr = { ws* ~ "(" ~ simple_expr ~ ")" }
-fn parens_expr(i: Input) -> IResult<Input, Box<Node>> {
+fn parens_expr(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     delimited(tag("("), simple_expr, tag(")"))(i)
 }
@@ -374,14 +374,14 @@ fn relop(i: Input) -> IResult<Input, BinaryOp> {
     )(i)
 }
 
-fn identifier(i: Input) -> IResult<Input, Box<Node>> {
+fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
     Ok((i, Node::from_identifier(ident)))
 }
 
-fn numeric(i: Input) -> IResult<Input, Box<Node>> {
+fn numeric(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     map(
         alt((hexnum, octnum, binnum, recognize_float)),

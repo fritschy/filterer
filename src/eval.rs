@@ -1,6 +1,6 @@
 // quick and hacked implementation of an expression evaluation
 
-use crate::nom_parser::{self, BinaryOp, Node, UnaryOp};
+use crate::nom_parser;
 use regex::Regex;
 use std::rc::Rc;
 
@@ -9,7 +9,7 @@ pub fn parse_num(i: &str) -> isize {
 }
 
 pub trait Accessor {
-    fn get_str<'a>(&'a self, k: &str) -> Result<Rc<String>, String>;
+    fn get_str(&self, k: &str) -> Result<Rc<String>, String>;
     fn get_num(&self, k: &str) -> Result<isize, String>;
 
     fn is_int(&self, k: &str) -> bool {
@@ -134,67 +134,5 @@ impl Value {
 
     pub fn is_nil(&self) -> bool {
         matches!(self, Value::Nil)
-    }
-}
-
-fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value> {
-    match node {
-        Node::StringLiteral(s) => Some(Value::Str(s.clone())),
-        Node::Constant(s) => Some(Value::Int(*s)),
-        Node::Identifier(s) => {
-            if let Ok(num) = e.get_num(s) {
-                Some(Value::Int(num))
-            } else if let Ok(s) = e.get_str(s) {
-                Some(Value::Str(s.clone()))
-            } else {
-                None
-            }
-        }
-        Node::Regexp(re) => Some(Value::Re(re.clone())),
-        Node::Nil => Some(Value::Nil),
-        _ => unreachable!(),
-    }
-}
-
-// FIXME: this is quickest and most inefficient way I could possibly imagine!
-impl Eval<&dyn Accessor> for Box<Node> {
-    fn eval_filter(&self, e: &dyn Accessor) -> bool {
-        fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value {
-            match node {
-                Node::Binary { rhs, op, lhs } => {
-                    let l = eval(lhs, e);
-
-                    match op {
-                        BinaryOp::And => (l.as_bool() && eval(rhs, e).as_bool()).into(),
-                        BinaryOp::Or => (l.as_bool() || eval(rhs, e).as_bool()).into(),
-                        _ => {
-                            let r = eval(rhs, e);
-
-                            match op {
-                                BinaryOp::Eq => (l == r).into(),
-                                BinaryOp::Ne => (l != r).into(),
-                                BinaryOp::Ge => (l.as_int() >= r.as_int()).into(),
-                                BinaryOp::Gt => (l.as_int() > r.as_int()).into(),
-                                BinaryOp::Le => (l.as_int() <= r.as_int()).into(),
-                                BinaryOp::Lt => (l.as_int() < r.as_int()).into(),
-                                BinaryOp::Match => (r.re_matches(l.as_str())).into(),
-
-                                BinaryOp::Band => Value::Int(l.as_int() & r.as_int()),
-                                BinaryOp::Or | BinaryOp::And => unreachable!(),
-                            }
-                        }
-                    }
-                }
-
-                Node::Unary { op, expr } => match op {
-                    UnaryOp::Not => Value::Int(if !eval(expr, e).as_bool() { 1 } else { 0 }),
-                    UnaryOp::Neg => Value::Int(-eval(expr, e).as_int()),
-                },
-
-                _ => value(node, e).unwrap_or(Value::Int(0)),
-            }
-        }
-
-        eval(self, e).as_bool()
     }
 }

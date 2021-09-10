@@ -104,29 +104,29 @@ impl Display for Machine {
 }
 
 impl Machine {
-    pub fn from_node(node: Box<Node>) -> Result<Machine, String> {
-        fn compile_<'a>(buf: &mut Vec<Instr>, node: &'a Node) -> Result<(), String> {
-            match node {
+    pub fn from_node(node: Rc<Node>) -> Result<Machine, String> {
+        fn compile_(buf: &mut Vec<Instr>, node: Rc<Node>) -> Result<(), String> {
+            match node.as_ref() {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
-                    compile_(buf, lhs)?;
-                    compile_(buf, rhs)?;
+                    compile_(buf, lhs.clone())?;
+                    compile_(buf, rhs.clone())?;
                     buf.push(op.into());
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, expr)?;
+                    compile_(buf, expr.clone())?;
                     buf.push(op.into());
                 }
 
-                _ => buf.push(node.into()),
+                _ => buf.push(node.as_ref().into()),
             }
 
             Ok(())
         }
 
         let mut buf = Vec::new();
-        if compile_(&mut buf, &node).is_ok() {
+        if compile_(&mut buf, node).is_ok() {
             Ok(Machine {
                 instr: buf,
                 mem: RefCell::new(Vec::new()),

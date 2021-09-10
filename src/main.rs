@@ -101,9 +101,7 @@ fn doit(l: &str, bench: bool) {
         let max = if bench { 1_000_000 } else { 1 };
         let msgs = messages();
         for _i in 0..max {
-            for m in msgs.iter().cloned() {
-                //println!("CodeEval: {}", c.eval(m));
-                //if x.eval_filter(m) {
+            for m in msgs.iter() {
                 if c.eval(m.clone()) {
                     count += 1;
                     if !bench {
