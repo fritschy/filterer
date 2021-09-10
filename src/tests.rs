@@ -2,10 +2,11 @@ use crate::eval::*;
 use crate::machine::Machine;
 use crate::nom_parser::parse;
 use regex::Regex;
+use std::rc::Rc;
 
-type Data<'a> = &'a str;
+type Data = &'static str;
 
-const DATA: &[Data<'static>] = &[
+const DATA: &[Data] = &[
     "abc",
     "cde",
     "ahi",
@@ -17,10 +18,10 @@ const DATA: &[Data<'static>] = &[
     "\"\\\"moo\\\"\n\t\\v\r\\f",
 ];
 
-impl Accessor for Data<'_> {
-    fn get_str<'a>(&'a self, k: &str) -> Result<&str, String> {
+impl Accessor for Data {
+    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
         if k == "d" {
-            Ok(self)
+            Ok(Rc::new(String::from(*self)))
         } else {
             Err("Unknown identifier".to_string())
         }
@@ -44,12 +45,12 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
         let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
         assert_eq!(d, expect);
 
-        let machine = Machine::from_node(&p).unwrap();
+        let machine = Machine::from_node(p).unwrap();
         println!("Code:\n{}", &machine);
         let d = DATA
             .iter()
-            .filter(|x| machine.eval(*x))
-            .map(|m| *m)
+            .cloned()
+            .filter(|x| machine.eval(Rc::new(*x)))
             .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
@@ -64,19 +65,19 @@ fn re(s: &str) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl Accessor for X {
-        fn get_str<'a>(&'a self, _: &str) -> Result<&'a str, String> {
-            Ok("1")
+        fn get_str<'a>(&'a self, _: &str) -> Result<Rc<String>, String> {
+            Ok(Rc::new(String::from("1")))
         }
         fn get_num(&self, _: &str) -> Result<isize, String> {
             Ok(1)
         }
     }
-    const DATA0: &X = &X;
+    const DATA0: X = X;
     let node = parse(expr).unwrap();
-    assert!(node.eval_filter(DATA0) == exp);
-    let machine = Machine::from_node(&node).unwrap();
+    assert!(node.eval_filter(&DATA0) == exp);
+    let machine = Machine::from_node(node).unwrap();
     println!("Code:\n{}", &machine);
-    assert!(machine.eval(DATA0) == exp);
+    assert!(machine.eval(Rc::new(DATA0)) == exp);
 }
 
 #[test]
@@ -200,12 +201,12 @@ fn mixing_types() {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-struct Item<'a>(isize, &'a str, isize);
+struct Item(isize, &'static str, isize);
 
-impl<'a> Accessor for Item<'a> {
-    fn get_str(&self, k: &str) -> Result<&'a str, String> {
+impl Accessor for &Item {
+    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
         match k {
-            "s" => Ok(self.1),
+            "s" => Ok(Rc::new(String::from(self.1))),
             _ => Err(format!("No such key: {}", k)),
         }
     }
@@ -235,7 +236,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
         let d = DATA2
             .iter()
-            .filter(|m| p.eval_filter(*m))
+            .filter(|m| p.eval_filter(m))
             .map(|m| *m)
             .collect::<Vec<_>>();
 
@@ -244,11 +245,11 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
         let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
         assert_eq!(d, expect);
 
-        let machine = Machine::from_node(&p).unwrap();
+        let machine = Machine::from_node(p).unwrap();
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
-            .filter(|x| machine.eval(*x))
+            .filter(|x| machine.eval(Rc::new(x.clone())))
             .map(|m| *m)
             .collect::<Vec<_>>();
         assert_eq!(d, expect);

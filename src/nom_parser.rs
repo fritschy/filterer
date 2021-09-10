@@ -11,6 +11,7 @@ use std::fmt;
 use std::num::ParseIntError;
 
 use crate::sema;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -23,10 +24,10 @@ pub enum Node {
         op: BinaryOp,
         rhs: Box<Node>,
     },
-    Identifier(String),
+    Identifier(Rc<String>),
     Constant(isize),
-    StringLiteral(String),
-    Regexp(regex::Regex),
+    StringLiteral(Rc<String>),
+    Regexp(Rc<regex::Regex>),
     Nil,
 }
 
@@ -123,7 +124,7 @@ pub fn parse_num(i: &str) -> Result<isize, ParseIntError> {
 
 impl Node {
     fn from_identifier(i: Input) -> Box<Node> {
-        Box::new(Node::Identifier(i.to_string()))
+        Box::new(Node::Identifier(Rc::new(i.to_string())))
     }
 
     fn from_numeric(i: Input) -> Box<Node> {
@@ -135,12 +136,12 @@ impl Node {
     }
 
     fn from_string(i: Input) -> Box<Node> {
-        Box::new(Node::StringLiteral(i.to_string()))
+        Box::new(Node::StringLiteral(Rc::new(i.to_string())))
     }
 
     fn from_regexp(i: Input) -> Box<Node> {
         if let Ok(re) = regex::Regex::new(i) {
-            Box::new(Node::Regexp(re))
+            Box::new(Node::Regexp(Rc::new(re)))
         } else {
             Box::new(Node::Nil)
         }

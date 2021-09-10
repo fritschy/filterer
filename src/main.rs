@@ -4,20 +4,23 @@ use rustyline::Editor;
 use std::fmt::{Display, Formatter};
 use std::io;
 
+use std::rc::Rc;
+
 use filterer::{eval::Accessor, machine::Machine, nom_parser};
 
-struct Message<'a> {
+#[derive(Clone)]
+struct Message {
     ts: usize,
     flags: usize,
-    ctx: &'a str,
-    app: &'a str,
+    ctx: Rc<String>,
+    app: Rc<String>,
     level: usize,
 }
 
 mod sw;
 use sw::Stopwatch;
 
-impl<'a> Display for Message<'a> {
+impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -27,11 +30,11 @@ impl<'a> Display for Message<'a> {
     }
 }
 
-impl<'a> Accessor for Message<'a> {
-    fn get_str(&self, k: &str) -> Result<&'a str, String> {
+impl Accessor for Message {
+    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
         Ok(match k {
-            "ctx" => self.ctx,
-            "app" => self.app,
+            "ctx" => self.ctx.clone(),
+            "app" => self.app.clone(),
             _ => return Err(format!("No such str {}", k)),
         })
     }
@@ -45,49 +48,49 @@ impl<'a> Accessor for Message<'a> {
     }
 }
 
-fn messages() -> Vec<Message<'static>> {
+fn messages() -> Vec<Rc<Message>> {
     vec![
-        Message {
+        Rc::new(Message {
             ts: 0,
             flags: 0x300,
-            ctx: "render",
-            app: "HMI2",
+            ctx: Rc::new(String::from("render")),
+            app: Rc::new(String::from("HMI2")),
             level: 0,
-        },
-        Message {
+        }),
+        Rc::new(Message {
             ts: 100,
             flags: 0x301,
-            ctx: "render",
-            app: "HMI1",
+            ctx: Rc::new(String::from("render")),
+            app: Rc::new(String::from("HMI1")),
             level: 0,
-        },
-        Message {
+        }),
+        Rc::new(Message {
             ts: 101,
             flags: 0x201,
-            ctx: "menu",
-            app: "HMI",
+            ctx: Rc::new(String::from("menu")),
+            app: Rc::new(String::from("HMI")),
             level: 3,
-        },
-        Message {
+        }),
+        Rc::new(Message {
             ts: 200,
             flags: 0x300,
-            ctx: "map",
-            app: "MAP",
+            ctx: Rc::new(String::from("map")),
+            app: Rc::new(String::from("MAP")),
             level: 1,
-        },
-        Message {
+        }),
+        Rc::new(Message {
             ts: 300,
             flags: 0x004,
-            ctx: "intersection",
-            app: "SideMAP",
+            ctx: Rc::new(String::from("intersection")),
+            app: Rc::new(String::from("SideMAP")),
             level: 1,
-        },
+        }),
     ]
 }
 
 fn doit(l: &str, bench: bool) {
     if let Err(e) = nom_parser::parse(l.trim()).map(|x| {
-        let c = Machine::from_node(&x).unwrap();
+        let c = Machine::from_node(x).unwrap();
 
         if !bench {
             // println!("Got: {:#?}", x.as_ref());
@@ -98,10 +101,10 @@ fn doit(l: &str, bench: bool) {
         let max = if bench { 1_000_000 } else { 1 };
         let msgs = messages();
         for _i in 0..max {
-            for m in msgs.iter() {
+            for m in msgs.iter().cloned() {
                 //println!("CodeEval: {}", c.eval(m));
                 //if x.eval_filter(m) {
-                if c.eval(m) {
+                if c.eval(m.clone()) {
                     count += 1;
                     if !bench {
                         println!("{}", m);

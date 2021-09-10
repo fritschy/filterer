@@ -1,15 +1,16 @@
-use crate::eval::{Eval, Accessor, Value};
+use crate::eval::{Accessor, Value};
 use crate::nom_parser::{BinaryOp, Node, UnaryOp};
 
 use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::{self, Display, Formatter};
+use std::rc::Rc;
 
 pub enum Instr {
-    LoadIdent(String),
-    LoadString(String),
+    LoadIdent(Rc<String>),
+    LoadString(Rc<String>),
     LoadNum(isize),
-    LoadRe(Regex),
+    LoadRe(Rc<Regex>),
     LoadNil,
     And,
     Or,
@@ -28,10 +29,10 @@ pub enum Instr {
 impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Instr::LoadIdent(x) => write!(f, "load ident {}", x),
-            Instr::LoadString(x) => write!(f, "load string \"{}\"", x),
+            Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
+            Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
             Instr::LoadNum(x) => write!(f, "load num {}", x),
-            Instr::LoadRe(x) => write!(f, "load re /{:?}/", x),
+            Instr::LoadRe(x) => write!(f, "load re /{:?}/", *x),
             Instr::LoadNil => write!(f, "load nil"),
             Instr::And => write!(f, "and"),
             Instr::Or => write!(f, "or"),
@@ -88,12 +89,12 @@ impl From<&Node> for Instr {
     }
 }
 
-pub struct Machine<'a> {
+pub struct Machine {
     instr: Vec<Instr>,
-    mem: RefCell<Vec<Value<'a>>>,
+    mem: RefCell<Vec<Value>>,
 }
 
-impl Display for Machine<'_> {
+impl Display for Machine {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for i in self.instr.iter() {
             writeln!(f, "{}", i)?;
@@ -102,8 +103,8 @@ impl Display for Machine<'_> {
     }
 }
 
-impl<'a> Machine<'a> {
-    pub fn from_node(node: &'a Node) -> Result<Machine<'a>, String> {
+impl Machine {
+    pub fn from_node(node: Box<Node>) -> Result<Machine, String> {
         fn compile_<'a>(buf: &mut Vec<Instr>, node: &'a Node) -> Result<(), String> {
             match node {
                 Node::Binary { rhs, op, lhs } => {
@@ -125,7 +126,7 @@ impl<'a> Machine<'a> {
         }
 
         let mut buf = Vec::new();
-        if compile_(&mut buf, node).is_ok() {
+        if compile_(&mut buf, &node).is_ok() {
             Ok(Machine {
                 instr: buf,
                 mem: RefCell::new(Vec::new()),
@@ -135,8 +136,8 @@ impl<'a> Machine<'a> {
         }
     }
 
-    pub fn eval(&'a self, a: &'a dyn Accessor) -> bool {
-        fn eval_<'a>(mach: &'a Machine<'a>, a: &'a dyn Accessor) -> Option<bool> {
+    pub fn eval(&self, a: Rc<dyn Accessor>) -> bool {
+        fn eval_(mach: &Machine, a: Rc<dyn Accessor>) -> Option<bool> {
             let mut mem = mach.mem.borrow_mut();
             mem.clear();
 
@@ -152,9 +153,9 @@ impl<'a> Machine<'a> {
                         }
                     }
 
-                    Instr::LoadString(x) => mem.push(Value::Str(x)),
+                    Instr::LoadString(x) => mem.push(Value::Str(x.clone())),
                     Instr::LoadNum(x) => mem.push(Value::Int(*x)),
-                    Instr::LoadRe(x) => mem.push(Value::Re(x)),
+                    Instr::LoadRe(x) => mem.push(Value::Re(x.clone())),
                     Instr::LoadNil => mem.push(Value::Nil),
 
                     Instr::Eq => {

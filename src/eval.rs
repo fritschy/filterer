@@ -2,13 +2,14 @@
 
 use crate::nom_parser::{self, BinaryOp, Node, UnaryOp};
 use regex::Regex;
+use std::rc::Rc;
 
 pub fn parse_num(i: &str) -> isize {
     nom_parser::parse_num(i).unwrap_or(0)
 }
 
 pub trait Accessor {
-    fn get_str<'a>(&'a self, k: &str) -> Result<&'a str, String>;
+    fn get_str<'a>(&'a self, k: &str) -> Result<Rc<String>, String>;
     fn get_num(&self, k: &str) -> Result<isize, String>;
 
     fn is_int(&self, k: &str) -> bool {
@@ -23,14 +24,14 @@ pub trait Eval<T> {
     fn eval_filter(&self, e: T) -> bool;
 }
 
-pub enum Value<'a> {
+pub enum Value {
     Int(isize),
-    Str(&'a str),
-    Re(&'a Regex),
+    Str(Rc<String>),
+    Re(Rc<Regex>),
     Nil,
 }
 
-impl<'a> From<bool> for Value<'a> {
+impl From<bool> for Value {
     fn from(b: bool) -> Self {
         if b {
             Self::Int(1)
@@ -40,13 +41,13 @@ impl<'a> From<bool> for Value<'a> {
     }
 }
 
-impl<'a> From<isize> for Value<'a> {
+impl From<isize> for Value {
     fn from(b: isize) -> Self {
         Self::Int(b)
     }
 }
 
-impl<'a> PartialEq for Value<'a> {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         if self.is_re() || other.is_re() {
             return false;
@@ -68,7 +69,7 @@ impl<'a> PartialEq for Value<'a> {
             }
         } else if let Value::Str(a) = self {
             if b_s {
-                return *a == other.as_str();
+                return a.as_str() == other.as_str();
             } else if b_i {
                 return parse_num(a) == other.as_int();
             }
@@ -78,11 +79,11 @@ impl<'a> PartialEq for Value<'a> {
     }
 }
 
-impl<'a> Value<'a> {
+impl Value {
     pub fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
-            Value::Str(x) => parse_num(*x),
+            Value::Str(x) => parse_num(x.as_str()),
             Value::Nil => 0,
             _ => panic!("as_int() needs to be a number"),
         }
@@ -91,14 +92,14 @@ impl<'a> Value<'a> {
     pub fn as_bool(&self) -> bool {
         match self {
             Value::Int(x) => *x != 0,
-            Value::Str(s) => *s != "0",
+            Value::Str(s) => s.as_str() != "0",
             _ => false,
         }
     }
 
     pub fn as_str(&self) -> &str {
         match self {
-            Value::Str(s) => *s,
+            Value::Str(s) => s.as_str(),
             Value::Int(0) | Value::Re(_) => "0",
             Value::Int(_) => "1",
             Value::Nil => "0",
@@ -107,7 +108,7 @@ impl<'a> Value<'a> {
 
     pub fn as_re(&self) -> &Regex {
         match self {
-            Value::Re(r) => *r,
+            Value::Re(r) => r,
             _ => panic!("Not an re"),
         }
     }
@@ -136,20 +137,20 @@ impl<'a> Value<'a> {
     }
 }
 
-fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
+fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value> {
     match node {
-        Node::StringLiteral(s) => Some(Value::Str(s)),
+        Node::StringLiteral(s) => Some(Value::Str(s.clone())),
         Node::Constant(s) => Some(Value::Int(*s)),
         Node::Identifier(s) => {
             if let Ok(num) = e.get_num(s) {
                 Some(Value::Int(num))
             } else if let Ok(s) = e.get_str(s) {
-                Some(Value::Str(s))
+                Some(Value::Str(s.clone()))
             } else {
                 None
             }
         }
-        Node::Regexp(re) => Some(Value::Re(re)),
+        Node::Regexp(re) => Some(Value::Re(re.clone())),
         Node::Nil => Some(Value::Nil),
         _ => unreachable!(),
     }
@@ -158,7 +159,7 @@ fn value<'a>(node: &'a Node, e: &'a dyn Accessor) -> Option<Value<'a>> {
 // FIXME: this is quickest and most inefficient way I could possibly imagine!
 impl Eval<&dyn Accessor> for Box<Node> {
     fn eval_filter(&self, e: &dyn Accessor) -> bool {
-        fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value<'a> {
+        fn eval<'a>(node: &'a Node, e: &'a dyn Accessor) -> Value {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     let l = eval(lhs, e);
