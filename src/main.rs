@@ -35,7 +35,7 @@ impl Accessor for Message {
         match k {
             "ctx" => Some(self.ctx.clone()),
             "app" => Some(self.app.clone()),
-            _ => return None,
+            _ => None,
         }
     }
     fn get_num(&self, k: &str) -> Option<isize> {
