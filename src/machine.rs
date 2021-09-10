@@ -5,11 +5,11 @@ use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::{self, Display, Formatter};
 
-pub enum Instr<'a> {
-    LoadIdent(&'a str),
-    LoadString(&'a str),
+pub enum Instr {
+    LoadIdent(String),
+    LoadString(String),
     LoadNum(isize),
-    LoadRe(&'a Regex),
+    LoadRe(Regex),
     LoadNil,
     And,
     Or,
@@ -25,7 +25,7 @@ pub enum Instr<'a> {
     Neg,
 }
 
-impl Display for Instr<'_> {
+impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Instr::LoadIdent(x) => write!(f, "load ident {}", x),
@@ -49,7 +49,7 @@ impl Display for Instr<'_> {
     }
 }
 
-impl<'a> From<&BinaryOp> for Instr<'a> {
+impl From<&BinaryOp> for Instr {
     fn from(op: &BinaryOp) -> Self {
         match op {
             BinaryOp::And => Instr::And,
@@ -66,7 +66,7 @@ impl<'a> From<&BinaryOp> for Instr<'a> {
     }
 }
 
-impl<'a> From<&UnaryOp> for Instr<'a> {
+impl From<&UnaryOp> for Instr {
     fn from(op: &UnaryOp) -> Self {
         match op {
             UnaryOp::Not => Instr::Not,
@@ -75,13 +75,13 @@ impl<'a> From<&UnaryOp> for Instr<'a> {
     }
 }
 
-impl<'a> From<&'a Node> for Instr<'a> {
-    fn from(node: &'a Node) -> Self {
+impl From<&Node> for Instr {
+    fn from(node: &Node) -> Self {
         match node {
-            Node::StringLiteral(s) => Instr::LoadString(s),
-            Node::Identifier(s) => Instr::LoadIdent(s),
+            Node::StringLiteral(s) => Instr::LoadString(s.clone()),
+            Node::Identifier(s) => Instr::LoadIdent(s.clone()),
             Node::Constant(i) => Instr::LoadNum(*i),
-            Node::Regexp(r) => Instr::LoadRe(r),
+            Node::Regexp(r) => Instr::LoadRe(r.clone()),
             Node::Nil => Instr::LoadNil,
             _ => unreachable!(),
         }
@@ -89,7 +89,7 @@ impl<'a> From<&'a Node> for Instr<'a> {
 }
 
 pub struct Machine<'a> {
-    instr: Vec<Instr<'a>>,
+    instr: Vec<Instr>,
     mem: RefCell<Vec<Value<'a>>>,
 }
 
@@ -104,7 +104,7 @@ impl Display for Machine<'_> {
 
 impl<'a> Machine<'a> {
     pub fn from_node(node: &'a Node) -> Result<Machine<'a>, String> {
-        fn compile_<'a>(buf: &mut Vec<Instr<'a>>, node: &'a Node) -> Result<(), String> {
+        fn compile_<'a>(buf: &mut Vec<Instr>, node: &'a Node) -> Result<(), String> {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
@@ -135,13 +135,13 @@ impl<'a> Machine<'a> {
         }
     }
 
-    pub fn eval(&self, a: &'a dyn Accessor) -> bool {
-        fn eval_<'a>(mach: &Machine<'a>, a: &'a dyn Accessor) -> Option<bool> {
+    pub fn eval(&'a self, a: &'a dyn Accessor) -> bool {
+        fn eval_<'a>(mach: &'a Machine<'a>, a: &'a dyn Accessor) -> Option<bool> {
             let mut mem = mach.mem.borrow_mut();
             mem.clear();
 
             for i in mach.instr.iter() {
-                match *i {
+                match i {
                     Instr::LoadIdent(x) => {
                         if a.is_int(x) {
                             mem.push(Value::Int(a.get_num(x).ok()?))
@@ -153,7 +153,7 @@ impl<'a> Machine<'a> {
                     }
 
                     Instr::LoadString(x) => mem.push(Value::Str(x)),
-                    Instr::LoadNum(x) => mem.push(Value::Int(x)),
+                    Instr::LoadNum(x) => mem.push(Value::Int(*x)),
                     Instr::LoadRe(x) => mem.push(Value::Re(x)),
                     Instr::LoadNil => mem.push(Value::Nil),
 
@@ -233,11 +233,5 @@ impl<'a> Machine<'a> {
                 false
             }
         }
-    }
-}
-
-impl<'a> Eval<&'a dyn Accessor> for Machine<'a> {
-    fn eval_filter(&self, e: &'a dyn Accessor) -> bool {
-        self.eval(e)
     }
 }
