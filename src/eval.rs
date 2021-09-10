@@ -9,8 +9,8 @@ pub fn parse_num(i: &str) -> isize {
 }
 
 pub trait Accessor {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, String>;
-    fn get_num(&self, k: &str) -> Result<isize, String>;
+    fn get_str(&self, k: &str) -> Result<Rc<String>, &'static str>;
+    fn get_num(&self, k: &str) -> Result<isize, &'static str>;
 
     fn is_int(&self, k: &str) -> bool {
         matches!(self.get_num(k), Ok(_))

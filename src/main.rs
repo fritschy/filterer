@@ -31,19 +31,19 @@ impl Display for Message {
 }
 
 impl Accessor for Message {
-    fn get_str(&self, k: &str) -> Result<Rc<String>, String> {
+    fn get_str(&self, k: &str) -> Result<Rc<String>, &'static str> {
         Ok(match k {
             "ctx" => self.ctx.clone(),
             "app" => self.app.clone(),
-            _ => return Err(format!("No such str {}", k)),
+            _ => return Err("No such str"),
         })
     }
-    fn get_num(&self, k: &str) -> Result<isize, String> {
+    fn get_num(&self, k: &str) -> Result<isize, &'static str> {
         Ok(match k {
             "flags" => self.flags as isize,
             "ts" => self.ts as isize,
             "level" => self.level as isize,
-            _ => return Err(format!("No such num {}", k)),
+            _ => return Err("No such num"),
         })
     }
 }
