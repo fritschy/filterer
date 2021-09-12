@@ -127,9 +127,10 @@ impl Machine {
 
         let mut buf = Vec::new();
         if compile_(&mut buf, node).is_ok() {
+            let blen = buf.len();
             Ok(Machine {
                 instr: buf,
-                mem: RefCell::new(Vec::new()),
+                mem: RefCell::new(Vec::with_capacity(blen)),
             })
         } else {
             Err("Could not compile".into())
