@@ -97,7 +97,6 @@ fn always_false() {
     check("0 < -1", false);
     check("0 <= -1", false);
     check("!16180", false);
-    check("0b0 || -0o0", false);
     check("/1/", false);
     check("1 && 0", false);
     check("0 && 1", false);

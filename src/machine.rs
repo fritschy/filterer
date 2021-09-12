@@ -23,7 +23,6 @@ pub enum Instr {
     BAnd,
     Match,
     Not,
-    Neg,
 }
 
 impl Display for Instr {
@@ -45,7 +44,6 @@ impl Display for Instr {
             Instr::BAnd => write!(f, "band"),
             Instr::Match => write!(f, "match"),
             Instr::Not => write!(f, "not"),
-            Instr::Neg => write!(f, "neg"),
         }
     }
 }
@@ -71,7 +69,6 @@ impl From<&UnaryOp> for Instr {
     fn from(op: &UnaryOp) -> Self {
         match op {
             UnaryOp::Not => Instr::Not,
-            UnaryOp::Neg => Instr::Neg,
         }
     }
 }
@@ -216,10 +213,6 @@ impl Machine {
                     Instr::Not => {
                         let e = mem.pop()?;
                         mem.push((!e.as_bool()).into());
-                    }
-                    Instr::Neg => {
-                        let e = mem.pop()?;
-                        mem.push((-e.as_int()).into());
                     }
                 }
             }

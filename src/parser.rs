@@ -59,7 +59,6 @@ impl From<&Node> for NodeType {
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Not, // !A
-    Neg, // -A
 }
 
 // Do we need this.... now?
@@ -104,7 +103,6 @@ impl<'a> From<Input<'a>> for UnaryOp {
     fn from(i: Input) -> Self {
         match i {
             "!" => UnaryOp::Not,
-            "-" => UnaryOp::Neg,
             _ => unreachable!("Unaknown operator {}", i),
         }
     }
@@ -284,7 +282,7 @@ fn sum_expr(i: Input) -> IResult<Input, Rc<Node>> {
 // unary_expr = { ws* ~ ("!" | "-")? ~ factor }
 fn unary_expr(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
-    let (i, op) = opt(map(alt((tag("!"), tag("-"))), UnaryOp::from))(i)?;
+    let (i, op) = opt(map(tag("!"), UnaryOp::from))(i)?;
     let (i, ue) = factor(i)?;
 
     if let Some(op) = op {
