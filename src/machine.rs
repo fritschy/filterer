@@ -15,7 +15,6 @@ pub enum Instr {
     And,
     Or,
     Eq,
-    Ne,
     Lt,
     Le,
     Gt,
@@ -36,7 +35,6 @@ impl Display for Instr {
             Instr::And => write!(f, "and"),
             Instr::Or => write!(f, "or"),
             Instr::Eq => write!(f, "eq"),
-            Instr::Ne => write!(f, "ne"),
             Instr::Lt => write!(f, "lt"),
             Instr::Le => write!(f, "le"),
             Instr::Gt => write!(f, "gt"),
@@ -54,13 +52,13 @@ impl From<&BinaryOp> for Instr {
             BinaryOp::And => Instr::And,
             BinaryOp::Or => Instr::Or,
             BinaryOp::Eq => Instr::Eq,
-            BinaryOp::Ne => Instr::Ne,
             BinaryOp::Ge => Instr::Ge,
             BinaryOp::Gt => Instr::Gt,
             BinaryOp::Le => Instr::Le,
             BinaryOp::Lt => Instr::Lt,
             BinaryOp::Match => Instr::Match,
             BinaryOp::Band => Instr::BAnd,
+            _ => unreachable!("Unmapped operator"),
         }
     }
 }
@@ -108,7 +106,12 @@ impl Machine {
                     // This needs to be reversed for eval.
                     compile_(buf, lhs.clone())?;
                     compile_(buf, rhs.clone())?;
-                    buf.push(op.into());
+                    if matches!(op, BinaryOp::Ne) {
+                        buf.push((&BinaryOp::Eq).into());
+                        buf.push((&UnaryOp::Not).into());
+                    } else {
+                        buf.push(op.into());
+                    }
                 }
 
                 Node::Unary { op, expr } => {
@@ -159,11 +162,6 @@ impl Machine {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
                         mem.push((l == r).into());
-                    }
-                    Instr::Ne => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l != r).into());
                     }
 
                     Instr::Gt => {
