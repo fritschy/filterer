@@ -159,6 +159,11 @@ impl Machine {
                     Instr::LoadRe(x) => mem.push(Value::Re(x.clone())),
                     Instr::LoadNil => mem.push(Value::Nil),
 
+                    Instr::Not => {
+                        let e = mem.pop()?;
+                        mem.push((!e.as_bool()).into());
+                    }
+
                     Instr::Eq => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
@@ -207,11 +212,6 @@ impl Machine {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
                         mem.push((r.re_matches(l.as_str())).into());
-                    }
-
-                    Instr::Not => {
-                        let e = mem.pop()?;
-                        mem.push((!e.as_bool()).into());
                     }
                 }
             }
