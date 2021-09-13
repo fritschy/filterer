@@ -145,10 +145,10 @@ impl Machine {
             for i in mach.instr.iter() {
                 match i {
                     Instr::LoadIdent(x) => {
-                        if a.is_int(x) {
-                            mem.push(Value::Int(a.get_num(x)?))
-                        } else if a.is_str(x) {
-                            mem.push(Value::Str(a.get_str(x)?))
+                        if let Some(i) = a.get_num(x) {
+                            mem.push(Value::Int(i))
+                        } else if let Some(s) = a.get_str(x) {
+                            mem.push(Value::Str(s))
                         } else {
                             mem.push(Value::Nil)
                         }

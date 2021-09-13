@@ -11,13 +11,6 @@ pub fn parse_num(i: &str) -> isize {
 pub trait Accessor {
     fn get_str(&self, k: &str) -> Option<Rc<String>>;
     fn get_num(&self, k: &str) -> Option<isize>;
-
-    fn is_int(&self, k: &str) -> bool {
-        self.get_num(k).is_some()
-    }
-    fn is_str(&self, k: &str) -> bool {
-        self.get_str(k).is_some()
-    }
 }
 
 pub enum Value {
