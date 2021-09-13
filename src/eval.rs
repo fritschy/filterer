@@ -45,33 +45,13 @@ impl From<isize> for Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
-        if self.is_re() || other.is_re() {
-            return false;
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::Int(a), Value::Str(b)) => *a == parse_num(b),
+            (Value::Str(a), Value::Int(b)) => parse_num(a) == *b,
+            (Value::Str(a), Value::Str(b)) => a == b,
+            _ => false,
         }
-
-        if self.is_nil() || other.is_nil() {
-            return false;
-        }
-
-        let b_i = other.is_int();
-        let b_s = other.is_str();
-
-        // allow comparison of nums and strings
-        if let Value::Int(a) = self {
-            if b_i {
-                return *a == other.as_int();
-            } else if b_s {
-                return *a == parse_num(other.as_str());
-            }
-        } else if let Value::Str(a) = self {
-            if b_s {
-                return a.as_str() == other.as_str();
-            } else if b_i {
-                return parse_num(a) == other.as_int();
-            }
-        }
-
-        false
     }
 }
 
