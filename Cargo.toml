@@ -3,16 +3,19 @@ name = "filterer"
 version = "0.1.0"
 edition = "2018"
 
-[dependencies]
-nom = "7.0"
-regex = "1"
-rustyline = { version = "9.0", optional = true }
-
-[features]
-default = ["readline"]
-readline = ["rustyline/default"]
-
 [profile.release]
 lto = true
 codegen-units = 1
 panic = 'abort'
+
+[[example]]
+name = "filterer"
+required-features = ["readline"]
+
+[dependencies]
+regex = "1"
+nom = "7.0"
+rustyline = { version = "9.0", optional = true }
+
+[features]
+readline = ["rustyline"]
