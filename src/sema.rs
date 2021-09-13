@@ -1,4 +1,4 @@
-use crate::parser::{BinaryOp, Node, NodeType, UnaryOp};
+use crate::parser::{BinaryOp, Node, UnaryOp};
 use std::rc::Rc;
 
 pub fn check(node: &Node) -> Result<(), String> {
@@ -6,19 +6,20 @@ pub fn check(node: &Node) -> Result<(), String> {
         match node {
             Node::Binary { lhs, op, rhs } => match op {
                 BinaryOp::Match => {
-                    if rhs.get_type() != NodeType::Regexp && rhs.get_type() != NodeType::Nil {
+                    if !matches!(rhs.as_ref(), Node::Regexp(_))
+                        && !matches!(rhs.as_ref(), Node::Nil) {
                         return Err("Match operator needs a right regex argument".to_string());
                     }
-                    if lhs.get_type() != NodeType::Identifier
-                        && lhs.get_type() != NodeType::StringLiteral
-                    {
+                    if !matches!(lhs.as_ref(), Node::Identifier(_))
+                        && !matches!(lhs.as_ref(), Node::StringLiteral(_)) {
                         return Err(
                             "Match operator needs a left string or identifier argument".to_string()
                         );
                     }
                 }
                 _ => {
-                    if rhs.get_type() == NodeType::Regexp || lhs.get_type() == NodeType::Regexp {
+                    if matches!(rhs.as_ref(), Node::Regexp(_))
+                        || matches!(lhs.as_ref(), Node::Regexp(_)) {
                         return Err("Regex not allowed here".to_string());
                     }
                     walk(lhs)?;
@@ -26,7 +27,7 @@ pub fn check(node: &Node) -> Result<(), String> {
                 }
             },
             Node::Unary { op: _, expr } => {
-                if expr.get_type() == NodeType::Regexp {
+                if matches!(expr.as_ref(), Node::Regexp(_)) {
                     return Err("Regex not allowed here".to_string());
                 }
                 walk(expr)?;

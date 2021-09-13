@@ -31,31 +31,6 @@ pub enum Node {
     Nil,
 }
 
-#[derive(PartialEq)]
-pub enum NodeType {
-    Unary,
-    Binary,
-    Identifier,
-    Constant,
-    StringLiteral,
-    Regexp,
-    Nil,
-}
-
-impl From<&Node> for NodeType {
-    fn from(n: &Node) -> Self {
-        match n {
-            Node::Unary { .. } => NodeType::Unary,
-            Node::Binary { .. } => NodeType::Binary,
-            Node::Identifier(_) => NodeType::Identifier,
-            Node::Constant(_) => NodeType::Constant,
-            Node::StringLiteral(_) => NodeType::StringLiteral,
-            Node::Regexp(_) => NodeType::Regexp,
-            Node::Nil => NodeType::Nil,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Not, // !A
@@ -151,10 +126,6 @@ impl Node {
 
     fn new_unary(op: UnaryOp, expr: Rc<Node>) -> Rc<Node> {
         Rc::new(Node::Unary { op, expr })
-    }
-
-    pub(crate) fn get_type(&self) -> NodeType {
-        self.into()
     }
 }
 
