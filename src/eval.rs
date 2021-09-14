@@ -11,6 +11,7 @@ pub fn parse_num(i: &str) -> isize {
 pub trait Accessor {
     fn get_str(&self, k: &str, i: usize) -> Option<Rc<String>>;
     fn get_num(&self, k: &str, i: usize) -> Option<isize>;
+    fn get_len(&self, k: &str) -> Option<isize>;
 }
 
 pub enum Value {

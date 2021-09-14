@@ -9,6 +9,7 @@ use std::rc::Rc;
 pub enum Instr {
     LoadIdent(Rc<String>),
     LoadIndexIdent(Rc<String>, usize),
+    LoadArrayIdentLen(Rc<String>),
     LoadString(Rc<String>),
     LoadNum(isize),
     LoadRe(Rc<Regex>),
@@ -30,6 +31,7 @@ impl fmt::Display for Instr {
         match self {
             Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
             Instr::LoadIndexIdent(x, i) => write!(f, "load ident {}[{}]", *x, *i),
+            Instr::LoadArrayIdentLen(x) => write!(f, "load ident {}.len", *x),
             Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
             Instr::LoadNum(x) => write!(f, "load num {}", x),
             Instr::LoadRe(x) => write!(f, "load re /{:?}/", *x),
@@ -79,6 +81,7 @@ impl From<&Node> for Instr {
             Node::StringLiteral(s) => Instr::LoadString(s.clone()),
             Node::Identifier(s) => Instr::LoadIdent(s.clone()),
             Node::IndexedIdentifier(s, i) => Instr::LoadIndexIdent(s.clone(), *i),
+            Node::ArrayIdentifierLen(s) => Instr::LoadArrayIdentLen(s.clone()),
             Node::Constant(i) => Instr::LoadNum(*i),
             Node::Regexp(r) => Instr::LoadRe(r.clone()),
             Node::Nil => Instr::LoadNil,
@@ -157,6 +160,10 @@ impl Machine {
                         } else {
                             mem.push(Value::Nil)
                         }
+                    }
+                    Instr::LoadArrayIdentLen(x) => {
+                        // FIXME: a.get_len(x)? could work, but I am unsure if it ... is appropriate
+                        mem.push(Value::Int(a.get_len(x).unwrap_or_default()));
                     }
 
                     Instr::LoadString(x) => mem.push(Value::Str(x.clone())),

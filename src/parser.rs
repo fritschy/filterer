@@ -26,6 +26,7 @@ pub enum Node {
     },
     Identifier(Rc<String>),
     IndexedIdentifier(Rc<String>, usize),
+    ArrayIdentifierLen(Rc<String>),
     Constant(isize),
     StringLiteral(Rc<String>),
     Regexp(Rc<regex::Regex>),
@@ -103,6 +104,10 @@ impl Node {
 
     fn from_indexed_identifier(ident: Input, index: usize) -> Rc<Node> {
         Rc::new(Node::IndexedIdentifier(Rc::new(ident.to_string()), index))
+    }
+
+    fn from_array_identifier_len(ident: Input) -> Rc<Node> {
+        Rc::new(Node::ArrayIdentifierLen(Rc::new(ident.to_string())))
     }
 
     fn from_numeric(i: Input) -> Rc<Node> {
@@ -356,8 +361,18 @@ fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     if let Ok((i, index)) = delimited(tag("["), alt((hexnum, octnum, binnum, decnum)), tag("]"))(i) {
         let num = parse_num(index).unwrap();  // FIXME: this should not be here...
         return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
+    } else if let Ok((i, _)) = dot_len(i) {
+        return Ok((i, Node::from_array_identifier_len(ident)));
     }
     Ok((i, Node::from_identifier(ident)))
+}
+
+fn dot_len(i: Input) -> IResult<Input, ()> {
+    let (i, _) = multispace0(i)?;
+    let (i, _) = tag(".")(i)?;
+    let (i, _) = multispace0(i)?;
+    let (i, _) = tag("len")(i)?;
+    Ok((i, ()))
 }
 
 fn numeric(i: Input) -> IResult<Input, Rc<Node>> {

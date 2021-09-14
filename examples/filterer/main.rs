@@ -39,6 +39,12 @@ impl Accessor for Message {
             _ => None,
         }
     }
+    fn get_len(&self, k: &str) -> Option<isize> {
+        match k {
+        "args" => Some(self.args.len() as isize),
+            _ => None,
+        }
+    }
     fn get_num(&self, k: &str, i: usize) -> Option<isize> {
         match (k, i) {
             ("flags", _) => Some(self.flags as isize),
@@ -181,6 +187,10 @@ fn main() -> io::Result<()> {
             println!("{}", "-".repeat(41));
         }
         doit("args", bench);
+        if !bench {
+            println!("{}", "-".repeat(41));
+        }
+        doit("args.len > 2", bench);
         if !bench {
             println!("{}", "-".repeat(41));
         }

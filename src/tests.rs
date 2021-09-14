@@ -30,6 +30,8 @@ impl Accessor for Data {
     fn get_num(&self, _: &str, _: usize) -> Option<isize> {
         None
     }
+
+    fn get_len(&self, _: &str) -> Option<isize> { None }
 }
 
 // Compare expr filter with iter filter
@@ -63,6 +65,7 @@ fn check(expr: &str, exp: bool) {
         fn get_num(&self, _: &str, _: usize) -> Option<isize> {
             Some(1)
         }
+        fn get_len(&self, _: &str) -> Option<isize> { None }
     }
     const DATA0: X = X;
     let node = parse(expr).unwrap();
@@ -208,6 +211,8 @@ impl Accessor for Item {
             _ => None,
         }
     }
+
+    fn get_len(&self, _: &str) -> Option<isize> { None }
 }
 
 const DATA2: &[Item] = &[
@@ -262,6 +267,13 @@ fn arrays() {
             None
         }
 
+        fn get_len(&self, k: &str) -> Option<isize> {
+            match k {
+                "a" => Some(self.a.len() as isize),
+                _ => None,
+            }
+        }
+
         fn get_num(&self, k: &str, i: usize) -> Option<isize> {
             match (k, i) {
                 ("i", _) => Some(self.i),
@@ -308,10 +320,15 @@ fn arrays() {
     compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
     compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
     compare("a[0x10000]", |_| false);
+    compare("a.len > 1", |x| x.a.len() > 1);
+    compare("a.len == 0", |x| x.a.is_empty());
 
     println!("{}", parse("a[\"non-numeric-index\"] > 0").unwrap_err().describe());
     println!("{}", parse("a[] > 0").unwrap_err().describe());
     println!("{}", parse("a[identifier] > 0").unwrap_err().describe());
     println!("{}", parse("a[a] > 0").unwrap_err().describe());
     println!("{}", parse("a[-10] > 0").unwrap_err().describe());
+    println!("{}", parse("a[10].len").unwrap_err().describe());
+    println!("{}", parse("a.length").unwrap_err().describe());
+    println!("{}", parse("a.len()").unwrap_err().describe());
 }
