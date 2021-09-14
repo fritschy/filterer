@@ -3,7 +3,7 @@ use crate::parser::{BinaryOp, Node, UnaryOp};
 
 use regex::Regex;
 use std::cell::RefCell;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
 use std::rc::Rc;
 
 pub enum Instr {
@@ -24,8 +24,8 @@ pub enum Instr {
     Not,
 }
 
-impl Display for Instr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Instr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
             Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
@@ -89,8 +89,8 @@ pub struct Machine {
     mem: RefCell<Vec<Value>>,
 }
 
-impl Display for Machine {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Display for Machine {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for i in self.instr.iter() {
             writeln!(f, "{}", i)?;
         }
