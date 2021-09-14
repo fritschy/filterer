@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 pub enum Instr {
     LoadIdent(Rc<String>),
+    LoadIndexIdent(Rc<String>, usize),
     LoadString(Rc<String>),
     LoadNum(isize),
     LoadRe(Rc<Regex>),
@@ -28,6 +29,7 @@ impl fmt::Display for Instr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
+            Instr::LoadIndexIdent(x, i) => write!(f, "load ident {}[{}]", *x, *i),
             Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
             Instr::LoadNum(x) => write!(f, "load num {}", x),
             Instr::LoadRe(x) => write!(f, "load re /{:?}/", *x),
@@ -76,6 +78,7 @@ impl From<&Node> for Instr {
         match node {
             Node::StringLiteral(s) => Instr::LoadString(s.clone()),
             Node::Identifier(s) => Instr::LoadIdent(s.clone()),
+            Node::IndexedIdentifier(s, i) => Instr::LoadIndexIdent(s.clone(), *i),
             Node::Constant(i) => Instr::LoadNum(*i),
             Node::Regexp(r) => Instr::LoadRe(r.clone()),
             Node::Nil => Instr::LoadNil,
@@ -138,9 +141,18 @@ impl Machine {
             for i in mach.instr.iter() {
                 match i {
                     Instr::LoadIdent(x) => {
-                        if let Some(i) = a.get_num(x) {
+                        if let Some(i) = a.get_num(x, 0) {
                             mem.push(Value::Int(i))
-                        } else if let Some(s) = a.get_str(x) {
+                        } else if let Some(s) = a.get_str(x, 0) {
+                            mem.push(Value::Str(s))
+                        } else {
+                            mem.push(Value::Nil)
+                        }
+                    }
+                    Instr::LoadIndexIdent(x, i) => {
+                        if let Some(i) = a.get_num(x, *i) {
+                            mem.push(Value::Int(i))
+                        } else if let Some(s) = a.get_str(x, *i) {
                             mem.push(Value::Str(s))
                         } else {
                             mem.push(Value::Nil)

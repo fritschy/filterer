@@ -15,6 +15,7 @@ struct Message {
     ctx: Rc<String>,
     app: Rc<String>,
     level: usize,
+    args: Vec<usize>,
 }
 
 mod sw;
@@ -24,25 +25,32 @@ impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[T {:<3} F 0x{:04x} C'{}' A'{}' L {}]",
-            self.ts, self.flags, self.ctx, self.app, self.level
+            "[T {:<3} F 0x{:04x} C'{}' A'{}' L {} A {:?}]",
+            self.ts, self.flags, self.ctx, self.app, self.level, self.args
         )
     }
 }
 
 impl Accessor for Message {
-    fn get_str(&self, k: &str) -> Option<Rc<String>> {
+    fn get_str(&self, k: &str, _i: usize) -> Option<Rc<String>> {
         match k {
             "ctx" => Some(self.ctx.clone()),
             "app" => Some(self.app.clone()),
             _ => None,
         }
     }
-    fn get_num(&self, k: &str) -> Option<isize> {
-        match k {
-            "flags" => Some(self.flags as isize),
-            "ts" => Some(self.ts as isize),
-            "level" => Some(self.level as isize),
+    fn get_num(&self, k: &str, i: usize) -> Option<isize> {
+        match (k, i) {
+            ("flags", _) => Some(self.flags as isize),
+            ("ts", _) => Some(self.ts as isize),
+            ("level", _) => Some(self.level as isize),
+            ("args", i) => {
+                if i < self.args.len() {
+                    Some(self.args[i] as isize)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -56,6 +64,7 @@ fn messages() -> Vec<Rc<Message>> {
             ctx: Rc::new(String::from("render")),
             app: Rc::new(String::from("HMI2")),
             level: 0,
+            args: vec![47, 11],
         }),
         Rc::new(Message {
             ts: 100,
@@ -63,6 +72,7 @@ fn messages() -> Vec<Rc<Message>> {
             ctx: Rc::new(String::from("render")),
             app: Rc::new(String::from("HMI1")),
             level: 0,
+            args: vec![42, 16, 29, 34],
         }),
         Rc::new(Message {
             ts: 101,
@@ -70,6 +80,7 @@ fn messages() -> Vec<Rc<Message>> {
             ctx: Rc::new(String::from("menu")),
             app: Rc::new(String::from("HMI")),
             level: 3,
+            args: vec![0, 1, 2],
         }),
         Rc::new(Message {
             ts: 200,
@@ -77,6 +88,7 @@ fn messages() -> Vec<Rc<Message>> {
             ctx: Rc::new(String::from("map")),
             app: Rc::new(String::from("MAP")),
             level: 1,
+            args: Vec::new(),
         }),
         Rc::new(Message {
             ts: 300,
@@ -84,6 +96,7 @@ fn messages() -> Vec<Rc<Message>> {
             ctx: Rc::new(String::from("intersection")),
             app: Rc::new(String::from("SideMAP")),
             level: 1,
+            args: vec![0, 8, 15],
         }),
     ]
 }
@@ -98,16 +111,18 @@ fn doit(l: &str, bench: bool) {
         }
 
         let mut count = 0;
+        let mut allcount = 0;
         let max = if bench { 1_000_000 } else { 1 };
         let msgs = messages();
         for _i in 0..max {
             for m in msgs.iter() {
                 if c.eval(m.as_ref()) {
-                    count += 1;
                     if !bench {
-                        println!("{}", m);
+                        println!("{} {}", allcount, m);
                     }
+                    count += 1;
                 }
+                allcount += 1;
             }
         }
 
@@ -162,6 +177,14 @@ fn main() -> io::Result<()> {
             println!("{}", "-".repeat(41));
         }
         doit("(((((((((((((((1)))))))))))))))", bench);
+        if !bench {
+            println!("{}", "-".repeat(41));
+        }
+        doit("args", bench);
+        if !bench {
+            println!("{}", "-".repeat(41));
+        }
+        doit("args[2] > 2", bench);
         let t = sw.elapsed();
         if bench {
             println!("Took {:?}", t);

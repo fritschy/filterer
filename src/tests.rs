@@ -19,7 +19,7 @@ const DATA: &[Data] = &[
 ];
 
 impl Accessor for Data {
-    fn get_str(&self, k: &str) -> Option<Rc<String>> {
+    fn get_str(&self, k: &str, _i: usize) -> Option<Rc<String>> {
         if k == "d" {
             Some(Rc::new(String::from(*self)))
         } else {
@@ -27,7 +27,7 @@ impl Accessor for Data {
         }
     }
 
-    fn get_num(&self, _: &str) -> Option<isize> {
+    fn get_num(&self, _: &str, _: usize) -> Option<isize> {
         None
     }
 }
@@ -57,10 +57,10 @@ fn re(s: &str) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl Accessor for X {
-        fn get_str(&self, _: &str) -> Option<Rc<String>> {
+        fn get_str(&self, _: &str, _: usize) -> Option<Rc<String>> {
             Some(Rc::new(String::from("1")))
         }
-        fn get_num(&self, _: &str) -> Option<isize> {
+        fn get_num(&self, _: &str, _: usize) -> Option<isize> {
             Some(1)
         }
     }
@@ -194,14 +194,14 @@ fn mixing_types() {
 struct Item(isize, &'static str, isize);
 
 impl Accessor for Item {
-    fn get_str(&self, k: &str) -> Option<Rc<String>> {
+    fn get_str(&self, k: &str, _i: usize) -> Option<Rc<String>> {
         match k {
             "s" => Some(Rc::new(String::from(self.1))),
             _ => None,
         }
     }
 
-    fn get_num(&self, k: &str) -> Option<isize> {
+    fn get_num(&self, k: &str, _i: usize) -> Option<isize> {
         match k {
             "i" => Some(self.0),
             "u" => Some(self.2),
@@ -247,4 +247,71 @@ fn comprehensive_data() {
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
         u & 0x100 != 0 && i < 7
     });
+}
+
+#[test]
+fn arrays() {
+    #[derive(PartialEq, Debug)]
+    struct D {
+        i: isize,
+        a: Vec<isize>,
+    }
+
+    impl Accessor for D {
+        fn get_str(&self, _: &str, _: usize) -> Option<Rc<String>> {
+            None
+        }
+
+        fn get_num(&self, k: &str, i: usize) -> Option<isize> {
+            match (k, i) {
+                ("i", _) => Some(self.i),
+                ("a", i) => {
+                    if i < self.a.len() {
+                        Some(self.a[i])
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        }
+    }
+
+    fn compare(expr: &str, f: impl Fn(&&D) -> bool) {
+        let data = vec![
+            D{i: 12, a: vec![9, 8, 7]},
+            D{i: 22, a: vec![0, 1, 2, 3, 4]},
+            D{i: 2, a: Vec::new()},
+            D{i: 3, a: vec![4711, 42]},
+            D{i: 5, a: vec![42]},
+        ];
+
+        if let Err(p) = parse(expr).map(|p| {
+            let expect = data.iter().filter(f).map(|m| m).collect::<Vec<_>>();
+
+            let machine = Machine::from_node(p.as_ref());
+            println!("Code:\n{}", &machine);
+            let d = data
+                .iter()
+                .filter(|x| machine.eval(*x))
+                .collect::<Vec<_>>();
+            assert_eq!(d, expect);
+        }) {
+            panic!("{}", p);
+        }
+    }
+
+    compare("a[0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0x0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0b0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0o3]", |x| x.a.len() > 3 && x.a[3] > 0);
+    compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
+    compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
+    compare("a[0x10000]", |_| false);
+
+    println!("{}", parse("a[\"non-numeric-index\"] > 0").unwrap_err().describe());
+    println!("{}", parse("a[] > 0").unwrap_err().describe());
+    println!("{}", parse("a[identifier] > 0").unwrap_err().describe());
+    println!("{}", parse("a[a] > 0").unwrap_err().describe());
+    println!("{}", parse("a[-10] > 0").unwrap_err().describe());
 }

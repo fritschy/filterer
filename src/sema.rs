@@ -32,11 +32,7 @@ pub fn check(node: &Node) -> Result<(), String> {
                 }
                 walk(expr)?;
             }
-            Node::Constant(_num) => (),
-            Node::StringLiteral(_s) => (),
-            Node::Identifier(_ident) => (),
-            Node::Regexp(_re) => (),
-            Node::Nil => (),
+            _ => (), // Nothing we can do here...
         }
         Ok(())
     }

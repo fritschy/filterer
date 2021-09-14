@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
 use nom::character::complete::{multispace0, satisfy};
-use nom::character::{is_alphanumeric, is_hex_digit, is_oct_digit};
+use nom::character::{is_alphanumeric, is_hex_digit, is_oct_digit, is_digit};
 use nom::combinator::{eof, map, opt, peek, recognize};
 use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
@@ -25,6 +25,7 @@ pub enum Node {
         rhs: Rc<Node>,
     },
     Identifier(Rc<String>),
+    IndexedIdentifier(Rc<String>, usize),
     Constant(isize),
     StringLiteral(Rc<String>),
     Regexp(Rc<regex::Regex>),
@@ -98,6 +99,10 @@ pub fn parse_num(i: &str) -> Result<isize, ParseIntError> {
 impl Node {
     fn from_identifier(i: Input) -> Rc<Node> {
         Rc::new(Node::Identifier(Rc::new(i.to_string())))
+    }
+
+    fn from_indexed_identifier(ident: Input, index: usize) -> Rc<Node> {
+        Rc::new(Node::IndexedIdentifier(Rc::new(ident.to_string()), index))
     }
 
     fn from_numeric(i: Input) -> Rc<Node> {
@@ -347,37 +352,48 @@ fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
+    let (i, _) = multispace0(i)?;
+    if let Ok((i, index)) = delimited(tag("["), alt((hexnum, octnum, binnum, decnum)), tag("]"))(i) {
+        let num = parse_num(index).unwrap();  // FIXME: this should not be here...
+        return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
+    }
     Ok((i, Node::from_identifier(ident)))
 }
 
 fn numeric(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = multispace0(i)?;
-    map(
+    let (i, n) = map(
         alt((hexnum, octnum, binnum, recognize_float)),
         Node::from_numeric,
-    )(i)
+    )(i)?;
+    let (i, _) = multispace0(i)?;
+    Ok((i, n))
 }
 
 fn prefixed_num<'a>(
-    pfx: &'_ str,
+    pfx: Option<&'_ str>,
     is_digit: impl Fn(u8) -> bool,
     i: &'a str,
 ) -> IResult<&'a str, &'a str> {
     let (i, _) = multispace0(i)?;
     recognize(|i| {
-        let (i, _) = tag(pfx)(i)?;
+        let (i, _) = if let Some(pfx) = pfx { tag(pfx)(i)? } else { (i, "") };
         take_till1(|x| !is_digit(x as u8))(i)
     })(i)
 }
 
+fn decnum(i: Input) -> IResult<Input, Input> {
+    prefixed_num(None, is_digit, i)
+}
+
 fn hexnum(i: Input) -> IResult<Input, Input> {
-    prefixed_num("0x", is_hex_digit, i)
+    prefixed_num(Some("0x"), is_hex_digit, i)
 }
 
 fn octnum(i: Input) -> IResult<Input, Input> {
-    prefixed_num("0o", is_oct_digit, i)
+    prefixed_num(Some("0o"), is_oct_digit, i)
 }
 
 fn binnum(i: Input) -> IResult<Input, Input> {
-    prefixed_num("0b", |x| x == b'0' || x == b'1', i)
+    prefixed_num(Some("0b"), |x| x == b'0' || x == b'1', i)
 }
