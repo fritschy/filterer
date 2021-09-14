@@ -1,28 +1,12 @@
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
 use filterer::{eval::Accessor, machine::Machine, parser};
-
-pub struct Stopwatch {
-    start: Instant,
-}
-
-impl Stopwatch {
-    pub fn new() -> Self {
-        Self {
-            start: Instant::now(),
-        }
-    }
-
-    pub fn elapsed(self) -> Duration {
-        Instant::now() - self.start
-    }
-}
 
 #[derive(Clone)]
 struct Message {
@@ -164,12 +148,10 @@ fn main() -> io::Result<()> {
             match readline {
                 Ok(l) => {
                     rl.add_history_entry(l.as_str());
-                    let sw = Stopwatch::new();
+                    let sw = Instant::now();
                     doit(&l, bench);
                     let t = sw.elapsed();
-                    if bench {
-                        println!("Took {:?}", t);
-                    }
+                    println!("Took {:?}", t);
                 }
                 Err(ReadlineError::Interrupted) => {
                     break;
@@ -193,7 +175,7 @@ fn main() -> io::Result<()> {
             "args.len && (args[3] > 0 || (args[2] & 1) || !(args[0] & 1)) && level >= 1 && level < 3 && app =~ !/HMI./",
         ];
 
-        let sw = Stopwatch::new();
+        let sw = Instant::now();
         for &expr in EXPRS.iter().take(if bench { 3 } else { EXPRS.len() }) {
             if !bench {
                 println!("\n{}", "-".repeat(41));
@@ -201,9 +183,7 @@ fn main() -> io::Result<()> {
             doit(expr, bench);
         }
         let t = sw.elapsed();
-        if bench {
-            println!("Took {:?}", t);
-        }
+        println!("Took {:?}", t);
     }
 
     Ok(())
