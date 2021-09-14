@@ -111,7 +111,7 @@ fn doit(l: &str, bench: bool) {
         let c = Machine::from_node(x.as_ref());
 
         if !bench {
-            // println!("Got: {:#?}", x.as_ref());
+            println!("{}", l);
             println!("Code:\n{}", c);
         }
 
@@ -172,28 +172,20 @@ fn main() -> io::Result<()> {
 
         rl.save_history("history.txt").unwrap();
     } else {
+        const EXPRS: &[&str] = &[
+            "flags == 0x300 || ts < 200",
+            "flags & 0x100 != 0b0 && ts <= 0o10101",
+            "(((((((((((((((1)))))))))))))))",
+            "args.len && (args[3] > 0 || (args[2] & 1) || !(args[0] & 1)) && level >= 1 && level < 3 && app =~ !/HMI./",
+        ];
+
         let sw = Stopwatch::new();
-        doit("flags == 0x300 || ts < 200", bench);
-        if !bench {
-            println!("{}", "-".repeat(41));
+        for &expr in EXPRS.iter().take(if bench { 3 } else { EXPRS.len() }) {
+            if !bench {
+                println!("\n{}", "-".repeat(41));
+            }
+            doit(expr, bench);
         }
-        doit("flags & 0x100 != 0b0 && ts <= 0o10101", bench);
-        if !bench {
-            println!("{}", "-".repeat(41));
-        }
-        doit("(((((((((((((((1)))))))))))))))", bench);
-        if !bench {
-            println!("{}", "-".repeat(41));
-        }
-        doit("args", bench);
-        if !bench {
-            println!("{}", "-".repeat(41));
-        }
-        doit("args.len > 2", bench);
-        if !bench {
-            println!("{}", "-".repeat(41));
-        }
-        doit("args[2] > 2", bench);
         let t = sw.elapsed();
         if bench {
             println!("Took {:?}", t);
