@@ -42,7 +42,7 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
         let d = DATA
             .iter()
             .cloned()
-            .filter(|x| machine.eval(Rc::new(*x)))
+            .filter(|x| machine.eval(x))
             .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
@@ -68,7 +68,7 @@ fn check(expr: &str, exp: bool) {
     let node = parse(expr).unwrap();
     let machine = Machine::from_node(node).unwrap();
     println!("Code:\n{}", &machine);
-    assert!(machine.eval(Rc::new(DATA0)) == exp);
+    assert!(machine.eval(&DATA0) == exp);
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn mixing_types() {
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct Item(isize, &'static str, isize);
 
-impl Accessor for &Item {
+impl Accessor for Item {
     fn get_str(&self, k: &str) -> Option<Rc<String>> {
         match k {
             "s" => Some(Rc::new(String::from(self.1))),
@@ -230,7 +230,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
-            .filter(|x| machine.eval(Rc::new(x.clone())))
+            .filter(|&x| machine.eval(x))
             .map(|m| *m)
             .collect::<Vec<_>>();
         assert_eq!(d, expect);

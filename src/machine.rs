@@ -127,18 +127,17 @@ impl Machine {
 
         let mut buf = Vec::new();
         if compile_(&mut buf, node).is_ok() {
-            let blen = buf.len();
             Ok(Machine {
                 instr: buf,
-                mem: RefCell::new(Vec::with_capacity(blen)),
+                mem: RefCell::new(Vec::with_capacity(16)),
             })
         } else {
             Err("Could not compile".into())
         }
     }
 
-    pub fn eval(&self, a: Rc<dyn Accessor>) -> bool {
-        fn eval_(mach: &Machine, a: Rc<dyn Accessor>) -> Option<bool> {
+    pub fn eval(&self, a: &dyn Accessor) -> bool {
+        fn eval_(mach: &Machine, a: &dyn Accessor) -> Option<bool> {
             let mut mem = mach.mem.borrow_mut();
             mem.clear();
 
@@ -215,6 +214,8 @@ impl Machine {
                     }
                 }
             }
+
+            assert!(mem.len() == 1);
 
             mem.pop().map(|x| x.as_bool())
         }

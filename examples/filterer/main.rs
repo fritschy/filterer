@@ -102,7 +102,7 @@ fn doit(l: &str, bench: bool) {
         let msgs = messages();
         for _i in 0..max {
             for m in msgs.iter() {
-                if c.eval(m.clone()) {
+                if c.eval(m.as_ref()) {
                     count += 1;
                     if !bench {
                         println!("{}", m);
