@@ -75,33 +75,10 @@ impl Value {
         }
     }
 
-    pub fn as_re(&self) -> &Regex {
-        match self {
-            Value::Re(r) => r,
-            _ => panic!("Not an re"),
-        }
-    }
-
     pub fn re_matches(&self, other: &str) -> bool {
         match self {
             Value::Re(r) => r.is_match(other),
             _ => false,
         }
-    }
-
-    pub fn is_int(&self) -> bool {
-        matches!(self, Value::Int(_))
-    }
-
-    pub fn is_str(&self) -> bool {
-        matches!(self, Value::Str(_))
-    }
-
-    pub fn is_re(&self) -> bool {
-        matches!(self, Value::Re(_))
-    }
-
-    pub fn is_nil(&self) -> bool {
-        matches!(self, Value::Nil)
     }
 }
