@@ -1,9 +1,11 @@
 // quick and hacked implementation of an expression evaluation
 
-use crate::parser;
-use regex::Regex;
-use std::rc::Rc;
 use std::cmp::Ordering;
+use std::rc::Rc;
+
+use regex::Regex;
+
+use crate::parser;
 
 pub fn parse_num(i: &str) -> isize {
     parser::parse_num(i).unwrap_or(0)

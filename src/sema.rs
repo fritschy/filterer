@@ -1,5 +1,6 @@
-use crate::parser::{BinaryOp, Node, UnaryOp};
 use std::rc::Rc;
+
+use crate::parser::{BinaryOp, Node, UnaryOp};
 
 pub fn check(node: &Node) -> Result<(), String> {
     fn walk(node: &Node) -> Result<(), String> {

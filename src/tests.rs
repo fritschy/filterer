@@ -1,8 +1,10 @@
+use std::rc::Rc;
+
+use regex::Regex;
+
 use crate::eval::*;
 use crate::machine::Machine;
 use crate::parser::parse;
-use regex::Regex;
-use std::rc::Rc;
 
 type Data = &'static str;
 

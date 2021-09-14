@@ -1,10 +1,11 @@
-use crate::eval::{Accessor, Value};
-use crate::parser::{BinaryOp, Node, UnaryOp};
-
-use regex::Regex;
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
+
+use regex::Regex;
+
+use crate::eval::{Accessor, Value};
+use crate::parser::{BinaryOp, Node, UnaryOp};
 
 pub enum Instr {
     LoadIdent(Rc<String>),

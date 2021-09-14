@@ -1,12 +1,12 @@
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
-
 use std::fmt::{Display, Formatter};
 use std::io;
-
 use std::rc::Rc;
 
+use rustyline::Editor;
+use rustyline::error::ReadlineError;
+
 use filterer::{eval::Accessor, machine::Machine, parser};
+use sw::Stopwatch;
 
 #[derive(Clone)]
 struct Message {
@@ -19,7 +19,6 @@ struct Message {
 }
 
 mod sw;
-use sw::Stopwatch;
 
 impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

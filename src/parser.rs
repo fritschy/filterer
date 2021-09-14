@@ -1,17 +1,17 @@
+use std::fmt;
+use std::num::ParseIntError;
+use std::rc::Rc;
+
+use nom::{AsChar, Finish, IResult, Offset};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
+use nom::character::{is_alphanumeric, is_digit, is_hex_digit, is_oct_digit};
 use nom::character::complete::{multispace0, satisfy};
-use nom::character::{is_alphanumeric, is_hex_digit, is_oct_digit, is_digit};
 use nom::combinator::{eof, map, opt, peek, recognize};
 use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
-use nom::{AsChar, Finish, IResult, Offset};
-
-use std::fmt;
-use std::num::ParseIntError;
 
 use crate::sema;
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Node {
