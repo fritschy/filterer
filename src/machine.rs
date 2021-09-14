@@ -227,7 +227,11 @@ impl Machine {
                     Instr::Match => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((r.re_matches(l.as_str())).into());
+                        if matches!(l, Value::Str(_)) {
+                            mem.push((r.re_matches(l.as_str())).into());
+                        } else {
+                            mem.push(false.into());
+                        }
                     }
                 }
             }

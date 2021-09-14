@@ -106,6 +106,7 @@ fn always_false() {
     check("0.1", false);
 
     compare("does_not_exist", |_| false);
+    compare("doesNotExist == doesNotExist", |_| false);
 }
 
 #[test]
@@ -193,6 +194,9 @@ fn mixing_types() {
     // Need to invoke PartialOrd for Value
     compare("d >= \"0x100\"", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
     compare("\"0x100\" <= d", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
+
+    // Nil cannot be matched against an Re
+    compare("doesNotExist =~ //", |_| false);
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
