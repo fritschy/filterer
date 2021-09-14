@@ -1,12 +1,28 @@
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
 use filterer::{eval::Accessor, machine::Machine, parser};
-use sw::Stopwatch;
+
+pub struct Stopwatch {
+    start: Instant,
+}
+
+impl Stopwatch {
+    pub fn new() -> Self {
+        Self {
+            start: Instant::now(),
+        }
+    }
+
+    pub fn elapsed(self) -> Duration {
+        Instant::now() - self.start
+    }
+}
 
 #[derive(Clone)]
 struct Message {
@@ -17,8 +33,6 @@ struct Message {
     level: usize,
     args: Vec<usize>,
 }
-
-mod sw;
 
 impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
