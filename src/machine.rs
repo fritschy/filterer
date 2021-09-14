@@ -46,8 +46,8 @@ impl fmt::Display for Instr {
     }
 }
 
-impl From<&BinaryOp> for Instr {
-    fn from(op: &BinaryOp) -> Self {
+impl From<BinaryOp> for Instr {
+    fn from(op: BinaryOp) -> Self {
         match op {
             BinaryOp::And => Instr::And,
             BinaryOp::Or => Instr::Or,
@@ -63,8 +63,8 @@ impl From<&BinaryOp> for Instr {
     }
 }
 
-impl From<&UnaryOp> for Instr {
-    fn from(op: &UnaryOp) -> Self {
+impl From<UnaryOp> for Instr {
+    fn from(op: UnaryOp) -> Self {
         match op {
             UnaryOp::Not => Instr::Not,
         }
@@ -99,40 +99,35 @@ impl fmt::Display for Machine {
 }
 
 impl Machine {
-    pub fn from_node(node: Rc<Node>) -> Result<Machine, String> {
-        fn compile_(buf: &mut Vec<Instr>, node: Rc<Node>) -> Result<(), String> {
-            match node.as_ref() {
+    pub fn from_node(node: &Node) -> Machine {
+        fn compile_(buf: &mut Vec<Instr>, node: &Node) {
+            match node {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
-                    compile_(buf, lhs.clone())?;
-                    compile_(buf, rhs.clone())?;
+                    compile_(buf, lhs.as_ref());
+                    compile_(buf, rhs.as_ref());
                     if matches!(op, BinaryOp::Ne) {
-                        buf.push((&BinaryOp::Eq).into());
-                        buf.push((&UnaryOp::Not).into());
+                        buf.push(BinaryOp::Eq.into());
+                        buf.push(UnaryOp::Not.into());
                     } else {
-                        buf.push(op.into());
+                        buf.push((*op).into());
                     }
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, expr.clone())?;
-                    buf.push(op.into());
+                    compile_(buf, expr.as_ref());
+                    buf.push((*op).into());
                 }
 
-                _ => buf.push(node.as_ref().into()),
+                _ => buf.push(node.into()),
             }
-
-            Ok(())
         }
 
         let mut buf = Vec::new();
-        if compile_(&mut buf, node).is_ok() {
-            Ok(Machine {
-                instr: buf,
-                mem: RefCell::new(Vec::with_capacity(16)),
-            })
-        } else {
-            Err("Could not compile".into())
+        compile_(&mut buf, node);
+        Machine {
+            instr: buf,
+            mem: RefCell::new(Vec::with_capacity(16)),
         }
     }
 

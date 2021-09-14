@@ -37,7 +37,7 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
         let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node(p).unwrap();
+        let machine = Machine::from_node(p.as_ref());
         println!("Code:\n{}", &machine);
         let d = DATA
             .iter()
@@ -66,7 +66,7 @@ fn check(expr: &str, exp: bool) {
     }
     const DATA0: X = X;
     let node = parse(expr).unwrap();
-    let machine = Machine::from_node(node).unwrap();
+    let machine = Machine::from_node(node.as_ref());
     println!("Code:\n{}", &machine);
     assert!(machine.eval(&DATA0) == exp);
 }
@@ -226,7 +226,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
         let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node(p).unwrap();
+        let machine = Machine::from_node(p.as_ref());
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()

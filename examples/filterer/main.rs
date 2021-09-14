@@ -90,7 +90,7 @@ fn messages() -> Vec<Rc<Message>> {
 
 fn doit(l: &str, bench: bool) {
     if let Err(e) = parser::parse(l.trim()).map(|x| {
-        let c = Machine::from_node(x).unwrap();
+        let c = Machine::from_node(x.as_ref());
 
         if !bench {
             // println!("Got: {:#?}", x.as_ref());
