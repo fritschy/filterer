@@ -187,10 +187,12 @@ fn mixing_types() {
     compare("\"0x100\" == 0x100", |_| true);
     compare("\"0x100\" == d", |&&x| x == "0x100");
     compare("d == \"0x200\"", |&&x| x == "0x200");
-    compare("d >= \"0x100\"", |&&x| x == "0x200" || x == "0x100");
     compare("\"0x200\" == d", |&&x| x == "0x200");
-    compare("\"0x100\" <= d", |&&x| x == "0x200" || x == "0x100");
     compare("0x100 == d", |&&x| x == "0x100");
+
+    // Need to invoke PartialOrd for Value
+    compare("d >= \"0x100\"", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
+    compare("\"0x100\" <= d", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -320,8 +322,15 @@ fn arrays() {
     compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
     compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
     compare("a[0x10000]", |_| false);
+    compare("a[0x10000] == a[0x10000]", |_| false);
     compare("a.len > 1", |x| x.a.len() > 1);
     compare("a.len == 0", |x| x.a.is_empty());
+    compare("i.len", |_| false);
+    compare("x.len", |_| false);
+    compare("z.len == 0", |_| false);
+    compare("z.len >= 0", |_| false);
+    compare("z.len < 0", |_| false);
+    compare("z.len == z.len", |_| false);
 
     println!("{}", parse("a[\"non-numeric-index\"] > 0").unwrap_err().describe());
     println!("{}", parse("a[] > 0").unwrap_err().describe());

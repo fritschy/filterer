@@ -3,6 +3,7 @@
 use crate::parser;
 use regex::Regex;
 use std::rc::Rc;
+use std::cmp::Ordering;
 
 pub fn parse_num(i: &str) -> isize {
     parser::parse_num(i).unwrap_or(0)
@@ -45,6 +46,18 @@ impl PartialEq for Value {
             (Value::Str(a), Value::Int(b)) => parse_num(a) == *b,
             (Value::Str(a), Value::Str(b)) => a == b,
             _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => a.partial_cmp(b),
+            (Value::Int(a), Value::Str(b)) => a.partial_cmp(&parse_num(b)),
+            (Value::Str(a), Value::Int(b)) => parse_num(a).partial_cmp(b),
+            (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
+            _ => None,
         }
     }
 }

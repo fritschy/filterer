@@ -163,7 +163,11 @@ impl Machine {
                     }
                     Instr::LoadArrayIdentLen(x) => {
                         // FIXME: a.get_len(x)? could work, but I am unsure if it ... is appropriate
-                        mem.push(Value::Int(a.get_len(x).unwrap_or_default()));
+                        if let Some(l) = a.get_len(x) {
+                            mem.push(Value::Int(l));
+                        } else {
+                            mem.push(Value::Nil);
+                        }
                     }
 
                     Instr::LoadString(x) => mem.push(Value::Str(x.clone())),
@@ -185,22 +189,22 @@ impl Machine {
                     Instr::Gt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() > r.as_int()).into());
+                        mem.push((l > r).into());
                     }
                     Instr::Ge => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() >= r.as_int()).into());
+                        mem.push((l >= r).into());
                     }
                     Instr::Lt => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() < r.as_int()).into());
+                        mem.push((l < r).into());
                     }
                     Instr::Le => {
                         let r = mem.pop()?;
                         let l = mem.pop()?;
-                        mem.push((l.as_int() <= r.as_int()).into());
+                        mem.push((l <= r).into());
                     }
 
                     // Yes, there is no short-circuit here...
