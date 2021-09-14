@@ -71,7 +71,7 @@ fn check(expr: &str, exp: bool) {
     let node = parse(expr).unwrap();
     let machine = Machine::from_node(node.as_ref());
     println!("Code:\n{}", &machine);
-    assert!(machine.eval(&DATA0) == exp);
+    assert_eq!(machine.eval(&DATA0), exp);
 }
 
 #[test]
@@ -273,13 +273,6 @@ fn arrays() {
             None
         }
 
-        fn get_len(&self, k: &str) -> Option<isize> {
-            match k {
-                "a" => Some(self.a.len() as isize),
-                _ => None,
-            }
-        }
-
         fn get_num(&self, k: &str, i: usize) -> Option<isize> {
             match (k, i) {
                 ("i", _) => Some(self.i),
@@ -290,6 +283,13 @@ fn arrays() {
                         None
                     }
                 }
+                _ => None,
+            }
+        }
+
+        fn get_len(&self, k: &str) -> Option<isize> {
+            match k {
+                "a" => Some(self.a.len() as isize),
                 _ => None,
             }
         }

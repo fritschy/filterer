@@ -162,7 +162,6 @@ impl Machine {
                         }
                     }
                     Instr::LoadArrayIdentLen(x) => {
-                        // FIXME: a.get_len(x)? could work, but I am unsure if it ... is appropriate
                         if let Some(l) = a.get_len(x) {
                             mem.push(Value::Int(l));
                         } else {
@@ -236,7 +235,7 @@ impl Machine {
                 }
             }
 
-            assert!(mem.len() == 1);
+            assert_eq!(mem.len(), 1);
 
             mem.pop().map(|x| x.as_bool())
         }

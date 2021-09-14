@@ -80,7 +80,7 @@ impl<'a> From<Input<'a>> for UnaryOp {
     fn from(i: Input) -> Self {
         match i {
             "!" => UnaryOp::Not,
-            _ => unreachable!("Unaknown operator {}", i),
+            _ => unreachable!("Unknown operator {}", i),
         }
     }
 }

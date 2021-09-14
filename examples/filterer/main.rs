@@ -39,12 +39,6 @@ impl Accessor for Message {
             _ => None,
         }
     }
-    fn get_len(&self, k: &str) -> Option<isize> {
-        match k {
-        "args" => Some(self.args.len() as isize),
-            _ => None,
-        }
-    }
     fn get_num(&self, k: &str, i: usize) -> Option<isize> {
         match (k, i) {
             ("flags", _) => Some(self.flags as isize),
@@ -57,6 +51,12 @@ impl Accessor for Message {
                     None
                 }
             }
+            _ => None,
+        }
+    }
+    fn get_len(&self, k: &str) -> Option<isize> {
+        match k {
+        "args" => Some(self.args.len() as isize),
             _ => None,
         }
     }
