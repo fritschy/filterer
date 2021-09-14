@@ -91,10 +91,9 @@ pub struct Machine {
 
 impl fmt::Display for Machine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for i in self.instr.iter() {
-            writeln!(f, "{}", i)?;
-        }
-        Ok(())
+        self.instr.iter().try_for_each(|instr| {
+            writeln!(f, "{}", instr)
+        })
     }
 }
 
@@ -123,7 +122,7 @@ impl Machine {
             }
         }
 
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(32);
         compile_(&mut buf, node);
         Machine {
             instr: buf,
