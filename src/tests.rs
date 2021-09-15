@@ -278,13 +278,7 @@ fn arrays() {
         fn get_num(&self, k: &str, i: usize) -> Option<isize> {
             match (k, i) {
                 ("i", _) => Some(self.i),
-                ("a", i) => {
-                    if i < self.a.len() {
-                        Some(self.a[i])
-                    } else {
-                        None
-                    }
-                }
+                ("a", i) if i < self.a.len() => Some(self.a[i]),
                 _ => None,
             }
         }

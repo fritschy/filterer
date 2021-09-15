@@ -41,19 +41,13 @@ impl Accessor for Message {
             ("flags", _) => Some(self.flags as isize),
             ("ts", _) => Some(self.ts as isize),
             ("level", _) => Some(self.level as isize),
-            ("args", i) => {
-                if i < self.args.len() {
-                    Some(self.args[i] as isize)
-                } else {
-                    None
-                }
-            }
+            ("args", i) if i < self.args.len() => Some(self.args[i] as isize),
             _ => None,
         }
     }
     fn get_len(&self, k: &str) -> Option<isize> {
         match k {
-        "args" => Some(self.args.len() as isize),
+            "args" => Some(self.args.len() as isize),
             _ => None,
         }
     }
