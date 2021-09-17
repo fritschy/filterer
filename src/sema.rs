@@ -41,7 +41,7 @@ pub fn check(node: &Node) -> Result<(), String> {
     walk(node)
 }
 
-fn transform_match_not_regex(node: Rc<Node>) -> Option<Rc<Node>> {
+fn transform_match_not_regex(node: &Rc<Node>) -> Option<Rc<Node>> {
     if let Node::Binary { lhs, op, rhs } = node.as_ref() {
         if matches!(op, &BinaryOp::Match) &&
             (matches!(lhs.as_ref(), Node::StringLiteral(_)) || matches!(lhs.as_ref(), Node::Identifier(_))) {
@@ -57,29 +57,29 @@ fn transform_match_not_regex(node: Rc<Node>) -> Option<Rc<Node>> {
     None
 }
 
-pub fn transform(node: Rc<Node>) -> Rc<Node> {
-    fn walk(node: Rc<Node>) -> Rc<Node> {
+pub fn transform(node: &Rc<Node>) -> Rc<Node> {
+    fn walk(node: &Rc<Node>) -> Rc<Node> {
         match node.as_ref() {
             Node::Binary {lhs, op, rhs} => {
-                if let Some(node) = transform_match_not_regex(node.clone()) {
+                if let Some(node) = transform_match_not_regex(node) {
                     return node;
                 }
 
                 Rc::new(Node::Binary {
-                    lhs: walk(lhs.clone()),
+                    lhs: walk(lhs),
                     op: *op,
-                    rhs: walk(rhs.clone()),
+                    rhs: walk(rhs),
                 })
             }
 
             Node::Unary {op, expr} => {
                 Rc::new(Node::Unary {
                     op: *op,
-                    expr: walk(expr.clone()),
+                    expr: walk(expr),
                 })
             }
 
-            _ => node,
+            _ => node.clone(),
         }
     }
 

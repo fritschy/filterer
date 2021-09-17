@@ -173,7 +173,7 @@ pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?
-            let o = sema::transform(o);
+            let o = sema::transform(&o);
             if let Err(serr) = sema::check(&o) {
                 return Err(ParseError::new(i, 0, format!("Semantic error: {}", serr)));
             }
