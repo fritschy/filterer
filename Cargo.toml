@@ -17,3 +17,4 @@ readline = ["rustyline"]
 
 [profile.release]
 lto = true
+debug = true
