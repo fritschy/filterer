@@ -44,14 +44,17 @@ impl fmt::Display for NamedInstr<'_> {
         match self.0 {
             Instr::LoadIdent(x) => {
                 let s = format!("load ident {}", x);
+                debug_assert!(self.1.contains_key(x));
                 write!(f, "{:18} # {}", s, self.1[x])
             }
             Instr::LoadIndexIdent(x, i) => {
                 let s = format!("load ident {}[{}]", x, i);
+                debug_assert!(self.1.contains_key(x));
                 write!(f, "{:18} # {}", s, self.1[x])
             }
             Instr::LoadArrayIdentLen(x) => {
                 let s = format!("load ident {}.len", x);
+                debug_assert!(self.1.contains_key(x));
                 write!(f, "{:18} # {}", s, self.1[x])
             }
 
