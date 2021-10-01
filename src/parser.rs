@@ -12,6 +12,7 @@ use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
 
 use crate::sema;
+use nom::error::{ErrorKind, Error};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -372,7 +373,7 @@ fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
     let (i, _) = multispace0(i)?;
     if let Ok((i, index)) = delimited(tag("["), alt((hexnum, octnum, binnum, decnum)), tag("]"))(i) {
-        let num = parse_num(index).unwrap();  // FIXME: this should not be here...
+        let num = parse_num(index).map_err(|x| nom::Err::Error(Error::new(i, ErrorKind::Digit)))?;
         return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
     } else if let Ok((i, _)) = dot_len(i) {
         return Ok((i, Node::from_array_identifier_len(ident)));
