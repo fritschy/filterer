@@ -1,0 +1,1 @@
+args.len && (args[3] > 0 || (args[2] & 1) || !(args[0] & 1)) && level >= 1 && level < 3 && app =~ !/HMI./
