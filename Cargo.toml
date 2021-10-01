@@ -7,8 +7,8 @@ edition = "2018"
 name = "filterer"
 required-features = ["readline"]
 
-[[example]]
-name = "afl-fuzz"
+[[bin]]
+name = "fuzz"
 required-features = ["fuzz"]
 
 [dependencies]
