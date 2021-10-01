@@ -212,8 +212,6 @@ impl Machine {
             .fold((0isize, 0), |(depth, max), i| {
                 let depth = depth
                     + match i {
-                        Instr::Not => 0,
-
                         // Pop 2, Push 1
                         Instr::And
                         | Instr::Or
@@ -222,10 +220,20 @@ impl Machine {
                         | Instr::Ge
                         | Instr::Le
                         | Instr::Gt
-                        | Instr::Lt => -1,
+                        | Instr::Lt
+                        | Instr::Eq => -1,
+
+                        // Pop 1, Push 1
+                        Instr::Not => 0,
 
                         // All loads push 1
-                        _ => 1,
+                        Instr::LoadIdent(_)
+                        | Instr::LoadIndexIdent(_, _)
+                        | Instr::LoadArrayIdentLen(_)
+                        | Instr::LoadString(_)
+                        | Instr::LoadNum(_)
+                        | Instr::LoadRe(_)
+                        | Instr::LoadNil => 1,
                     };
 
                 (depth, max.max(depth as usize))
