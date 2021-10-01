@@ -19,7 +19,7 @@ pub struct ExprEval {
 
 impl ExprEval {
     pub fn eval<T: KeyAccessor>(&self, a: T) -> bool {
-        self.vm.eval(&a)
+        self.vm.eval(a)
     }
 }
 

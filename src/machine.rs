@@ -241,8 +241,8 @@ impl Machine {
             .1
     }
 
-    pub(crate) fn eval(&self, a: &dyn KeyAccessor) -> bool {
-        fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> bool {
+    pub(crate) fn eval<T: KeyAccessor>(&self, a: T) -> bool {
+        fn eval_<T: KeyAccessor>(mach: &Machine, a: T) -> bool {
             let mut mem = mach.mem.borrow_mut();
             let stack_size = mem.len();
             let mut cur = 0;
