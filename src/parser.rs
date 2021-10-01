@@ -15,7 +15,7 @@ use crate::sema;
 use nom::error::{ErrorKind, context};
 
 #[derive(Debug, Clone)]
-pub enum Node {
+pub(crate) enum Node {
     Unary {
         op: UnaryOp,
         expr: Rc<Node>,
@@ -35,13 +35,13 @@ pub enum Node {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum UnaryOp {
+pub(crate) enum UnaryOp {
     Not, // !A
 }
 
 // Do we need this.... now?
 #[derive(Debug, Clone, Copy)]
-pub enum BinaryOp {
+pub(crate) enum BinaryOp {
     Eq, // A == B
     Ne, // A != B
     Gt, // A >  B
@@ -86,7 +86,7 @@ impl<'a> From<Input<'a>> for UnaryOp {
     }
 }
 
-pub fn parse_num(i: &str) -> Result<isize, ParseIntError> {
+pub(crate) fn parse_num(i: &str) -> Result<isize, ParseIntError> {
     if let Some(i) = i.strip_prefix("0x") {
         isize::from_str_radix(i, 16)
     } else if let Some(i) = i.strip_prefix("0o") {
@@ -142,9 +142,9 @@ impl Node {
 
 #[derive(Debug)]
 pub struct ParseError<'a> {
-    pub input: Input<'a>,
-    pub pos: usize,
-    pub msg: String,
+    input: Input<'a>,
+    pos: usize,
+    msg: String,
 }
 
 impl<'a> ParseError<'a> {
@@ -170,7 +170,7 @@ impl<'a> fmt::Display for ParseError<'a> {
     }
 }
 
-pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
+pub(crate) fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?

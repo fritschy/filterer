@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 
-pub fn check(node: &Node) -> Result<(), String> {
+pub(crate) fn check(node: &Node) -> Result<(), String> {
     fn walk(node: &Node) -> Result<(), String> {
         match node {
             Node::Binary { lhs, op, rhs } => match op {
@@ -57,7 +57,7 @@ fn transform_match_not_regex(node: &Rc<Node>) -> Option<Rc<Node>> {
     None
 }
 
-pub fn transform(node: &Rc<Node>) -> Rc<Node> {
+pub(crate) fn transform(node: &Rc<Node>) -> Rc<Node> {
     fn walk(node: &Rc<Node>) -> Rc<Node> {
         match node.as_ref() {
             Node::Binary {lhs, op, rhs} => {

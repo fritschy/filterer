@@ -12,7 +12,7 @@ pub fn parse_num(i: &str) -> isize {
 }
 
 #[derive(Clone)]
-pub enum Value {
+pub(crate) enum Value {
     Int(isize),
     Str(Rc<String>),
     Re(Rc<Regex>),
@@ -60,7 +60,7 @@ impl PartialOrd for Value {
 }
 
 impl Value {
-    pub fn as_int(&self) -> isize {
+    pub(crate) fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
             Value::Str(x) => value::parse_num(x.as_str()),
@@ -69,7 +69,7 @@ impl Value {
         }
     }
 
-    pub fn as_bool(&self) -> bool {
+    pub(crate) fn as_bool(&self) -> bool {
         match self {
             Value::Int(x) => *x != 0,
             Value::Str(s) => s.as_str() != "0",
@@ -77,7 +77,7 @@ impl Value {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Value::Str(s) => s.as_str(),
             Value::Int(0) | Value::Re(_) => "0",
@@ -86,7 +86,7 @@ impl Value {
         }
     }
 
-    pub fn re_matches(&self, other: &str) -> bool {
+    pub(crate) fn re_matches(&self, other: &str) -> bool {
         match self {
             Value::Re(r) => r.is_match(other),
             _ => false,

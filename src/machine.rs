@@ -113,7 +113,7 @@ impl Instr {
     }
 }
 
-pub struct Machine {
+pub(crate) struct Machine {
     instr: Vec<Instr>,
     mem: RefCell<Vec<Value>>,
     ident_names: BTreeMap<usize, String>,
@@ -131,7 +131,7 @@ impl fmt::Display for Machine {
 }
 
 impl Machine {
-    pub fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Machine {
+    pub(crate) fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Machine {
         fn compile_(
             buf: &mut Vec<Instr>,
             ident_names: &mut BTreeMap<usize, String>,
@@ -241,7 +241,7 @@ impl Machine {
             .1
     }
 
-    pub fn eval(&self, a: &dyn KeyAccessor) -> bool {
+    pub(crate) fn eval(&self, a: &dyn KeyAccessor) -> bool {
         fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> bool {
             let mut mem = mach.mem.borrow_mut();
             let stack_size = mem.len();

@@ -6,8 +6,7 @@ use std::time::Instant;
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
-use filterer::{machine::Machine, parser};
-use filterer::machine::{AccessorQuery, KeyAccessor};
+use filterer::{compile, AccessorQuery, KeyAccessor};
 
 #[derive(Clone)]
 struct Message {
@@ -132,9 +131,7 @@ fn messages() -> Vec<Rc<Message>> {
 }
 
 fn doit(l: &str, bench: bool) {
-    if let Err(e) = parser::parse(l.trim()).map(|x| {
-        let c = Machine::from_node_and_accessor(x.as_ref(), &MessageQuery);
-
+    if let Err(e) = compile(l.trim(), &MessageQuery).map(|c| {
         if !bench {
             println!("{}", l);
             println!("Code:\n{}", c);
