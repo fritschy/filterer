@@ -55,7 +55,7 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
         let d = DATA
             .iter()
             .cloned()
-            .filter(|x| machine.eval(x))
+            .filter(|x| machine.eval(*x))
             .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
@@ -91,7 +91,7 @@ fn check(expr: &str, exp: bool) {
     const DATA0: X = X;
     let machine = compile(expr, &X).unwrap();
     println!("Code:\n{}", &machine);
-    assert_eq!(machine.eval(&DATA0), exp);
+    assert_eq!(machine.eval(DATA0), exp);
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn one_array_only() {
         let machine = compile(expr, &X).unwrap();
         println!("Code:\n{}", &machine);
 
-        let x = DATA.iter().filter(|&x| machine.eval(x)).collect::<Vec<_>>();
+        let x = DATA.iter().filter(|&x| machine.eval(*x)).collect::<Vec<_>>();
         let expect = DATA.iter().filter(f).collect::<Vec<_>>();
 
         assert_eq!(expect, x);
@@ -326,7 +326,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
-            .filter(|&x| machine.eval(x))
+            .filter(|&x| machine.eval(*x))
             .map(|m| *m)
             .collect::<Vec<_>>();
         assert_eq!(d, expect);
@@ -356,7 +356,7 @@ fn arrays() {
         a: Vec<isize>,
     }
 
-    impl KeyAccessor for D {
+    impl KeyAccessor for &D {
         fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
             None
         }

@@ -35,7 +35,7 @@ mod keys {
     pub const ARGS: usize = 5;
 }
 
-impl KeyAccessor for Message {
+impl KeyAccessor for &Message {
     fn get_str(&self, k: usize, _i: usize) -> Option<Rc<String>> {
         match k {
             keys::CTX => Some(self.ctx.clone()),
