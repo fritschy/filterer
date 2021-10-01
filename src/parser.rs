@@ -321,16 +321,25 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
     move |i| {
         preceded(
             tag("\\"),
-            alt((
+            map(alt((
                 tag(delimiter),
                 tag("n"),
                 tag("r"),
                 tag("0"),
-                tag("f"),
-                tag("b"),
                 tag("t"),
-                tag("v"),
-            )),
+            )), move |c| {
+                if c == delimiter {
+                    return c;
+                }
+
+                match c {
+                    "n" => "\n",
+                    "r" => "\r",
+                    "0" => "\0",
+                    "t" => "\t",
+                    _ => unreachable!(),
+                }
+            }),
         )(i)
     }
 }
