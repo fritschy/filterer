@@ -6,6 +6,7 @@ use regex::Regex;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
+use std::collections::BTreeMap;
 
 pub trait KeyAccessor {
     fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>>;
@@ -38,12 +39,21 @@ pub enum Instr {
     Not,
 }
 
-impl fmt::Display for Instr {
+impl fmt::Display for NamedInstr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
-            Instr::LoadIndexIdent(x, i) => write!(f, "load ident {}[{}]", *x, *i),
-            Instr::LoadArrayIdentLen(x) => write!(f, "load ident {}.len", *x),
+        match self.0 {
+            Instr::LoadIdent(x) => {
+                let s = format!("load ident {}", x);
+                write!(f, "{:18} # {}", s, self.1[x])
+            }
+            Instr::LoadIndexIdent(x, i) => {
+                let s = format!("load ident {}[{}]", x, i);
+                write!(f, "{:18} # {}", s, self.1[x])
+            }
+            Instr::LoadArrayIdentLen(x) => {
+                let s = format!("load ident {}.len", x);
+                write!(f, "{:18} # {}", s, self.1[x])
+            }
 
             Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
             Instr::LoadNum(x) => write!(f, "load num {}", x),
@@ -103,24 +113,33 @@ impl From<&Node> for Instr {
 pub struct Machine {
     instr: Vec<Instr>,
     mem: RefCell<Vec<Value>>,
+    ident_names: BTreeMap<usize, String>,
 }
+
+// Solely used for formatting instructions
+struct NamedInstr<'a>(&'a Instr, &'a BTreeMap<usize, String>);
 
 impl fmt::Display for Machine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.instr.iter().try_for_each(|instr| {
-            writeln!(f, "{}", instr)
-        })
+        self.instr
+            .iter()
+            .try_for_each(|instr| writeln!(f, "{}", NamedInstr(&instr, &self.ident_names)))
     }
 }
 
 impl Machine {
     pub fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Machine {
-        fn compile_(buf: &mut Vec<Instr>, acc: &dyn AccessorQuery, node: &Node) {
+        fn compile_(
+            buf: &mut Vec<Instr>,
+            ident_names: &mut BTreeMap<usize, String>,
+            acc: &dyn AccessorQuery,
+            node: &Node,
+        ) {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
-                    compile_(buf, acc, lhs.as_ref());
-                    compile_(buf, acc, rhs.as_ref());
+                    compile_(buf, ident_names, acc, lhs.as_ref());
+                    compile_(buf, ident_names, acc, rhs.as_ref());
                     if matches!(op, BinaryOp::Ne) {
                         buf.push(BinaryOp::Eq.into());
                         buf.push(UnaryOp::Not.into());
@@ -130,12 +149,13 @@ impl Machine {
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, acc, expr.as_ref());
+                    compile_(buf, ident_names, acc, expr.as_ref());
                     buf.push((*op).into());
                 }
 
                 Node::Identifier(x) => {
                     if let Some(ik) = acc.get_ident(x) {
+                        ident_names.entry(ik).or_insert(x.to_string());
                         buf.push(Instr::LoadIdent(ik))
                     } else {
                         eprintln!("Could not lookup ident '{}', emitting 'load nil'", x);
@@ -145,6 +165,7 @@ impl Machine {
 
                 Node::IndexedIdentifier(x, i) => {
                     if let Some(ik) = acc.get_ident(x) {
+                        ident_names.entry(ik).or_insert(x.to_string());
                         buf.push(Instr::LoadIndexIdent(ik, *i))
                     } else {
                         eprintln!("Could not lookup index ident '{}', emitting 'load nil'", x);
@@ -154,9 +175,13 @@ impl Machine {
 
                 Node::ArrayIdentifierLen(x) => {
                     if let Some(ik) = acc.get_ident(x) {
+                        ident_names.entry(ik).or_insert(x.to_string());
                         buf.push(Instr::LoadArrayIdentLen(ik))
                     } else {
-                        eprintln!("Could not lookup array len ident '{}', emitting 'load nil'", x);
+                        eprintln!(
+                            "Could not lookup array len ident '{}', emitting 'load nil'",
+                            x
+                        );
                         buf.push(Instr::LoadNil)
                     }
                 }
@@ -166,12 +191,14 @@ impl Machine {
         }
 
         let mut buf = Vec::with_capacity(32);
+        let mut ident_names = BTreeMap::new();
 
-        compile_(&mut buf, acc, node);
+        compile_(&mut buf, &mut ident_names, acc, node);
 
         Machine {
             instr: buf,
             mem: RefCell::new(Vec::with_capacity(16)),
+            ident_names,
         }
     }
 
