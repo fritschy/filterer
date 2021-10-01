@@ -6,7 +6,7 @@ use std::time::Instant;
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
-use filterer::{compile, AccessorQuery, KeyAccessor};
+use filterer::{AccessorQuery, compile, KeyAccessor};
 
 #[derive(Clone)]
 struct Message {

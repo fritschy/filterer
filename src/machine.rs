@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -6,7 +7,6 @@ use regex::Regex;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
-use std::collections::BTreeMap;
 
 pub trait KeyAccessor {
     fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>>;

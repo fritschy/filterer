@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 mod sema;
 mod value;
 
@@ -7,11 +9,9 @@ mod machine;
 #[cfg(test)]
 mod tests;
 
-use std::fmt::{Display, Formatter};
-
 // Following is our public interface
+pub use crate::machine::{AccessorQuery, KeyAccessor};
 pub use crate::parser::ParseError;
-pub use crate::machine::{KeyAccessor, AccessorQuery};
 
 pub struct ExprEval {
     vm: machine::Machine,

@@ -4,7 +4,7 @@ extern crate afl;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
-use filterer::{compile, AccessorQuery, KeyAccessor};
+use filterer::{AccessorQuery, compile, KeyAccessor};
 
 #[derive(Clone)]
 struct Message {

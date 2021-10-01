@@ -7,12 +7,12 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
 use nom::character::{is_alphanumeric, is_digit, is_hex_digit, is_oct_digit};
 use nom::character::complete::{multispace0, satisfy};
-use nom::combinator::{eof, map, opt, peek, recognize, fail};
+use nom::combinator::{eof, fail, map, opt, peek, recognize};
+use nom::error::{context, ErrorKind};
 use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
 
 use crate::sema;
-use nom::error::{ErrorKind, context};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {

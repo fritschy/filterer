@@ -2,11 +2,10 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use crate::machine::{KeyAccessor, AccessorQuery};
-use crate::parser::parse;
-use crate::value::{Value, parse_num};
-
 use crate::compile;
+use crate::machine::{AccessorQuery, KeyAccessor};
+use crate::parser::parse;
+use crate::value::{parse_num, Value};
 
 type Data = &'static str;
 

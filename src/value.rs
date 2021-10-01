@@ -3,8 +3,6 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use crate::value;
-
 use crate::parser;
 
 pub fn parse_num(i: &str) -> isize {
@@ -39,8 +37,8 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a == b,
-            (Value::Int(a), Value::Str(b)) => *a == value::parse_num(b),
-            (Value::Str(a), Value::Int(b)) => value::parse_num(a) == *b,
+            (Value::Int(a), Value::Str(b)) => *a == parse_num(b),
+            (Value::Str(a), Value::Int(b)) => parse_num(a) == *b,
             (Value::Str(a), Value::Str(b)) => a == b,
             _ => false,
         }
@@ -51,8 +49,8 @@ impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a.partial_cmp(b),
-            (Value::Int(a), Value::Str(b)) => a.partial_cmp(&value::parse_num(b)),
-            (Value::Str(a), Value::Int(b)) => value::parse_num(a).partial_cmp(b),
+            (Value::Int(a), Value::Str(b)) => a.partial_cmp(&parse_num(b)),
+            (Value::Str(a), Value::Int(b)) => parse_num(a).partial_cmp(b),
             (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
             _ => None,
         }
@@ -63,7 +61,7 @@ impl Value {
     pub(crate) fn as_int(&self) -> isize {
         match self {
             Value::Int(x) => *x,
-            Value::Str(x) => value::parse_num(x.as_str()),
+            Value::Str(x) => parse_num(x.as_str()),
             Value::Nil => 0,
             _ => panic!("as_int() needs to be a number"),
         }
