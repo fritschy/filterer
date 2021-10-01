@@ -7,13 +7,19 @@ edition = "2018"
 name = "filterer"
 required-features = ["readline"]
 
+[[example]]
+name = "afl-fuzz"
+required-features = ["fuzz"]
+
 [dependencies]
 regex = "1"
 nom = "7.0"
 rustyline = { version = "9.0", optional = true }
+afl = { version = "*", optional = true }
 
 [features]
 readline = ["rustyline"]
+fuzz = ["afl"]
 
 [profile.release]
 lto = true
