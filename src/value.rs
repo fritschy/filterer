@@ -11,6 +11,7 @@ pub fn parse_num(i: &str) -> isize {
     parser::parse_num(i).unwrap_or(0)
 }
 
+#[derive(Clone)]
 pub enum Value {
     Int(isize),
     Str(Rc<String>),

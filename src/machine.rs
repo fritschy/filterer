@@ -198,123 +198,176 @@ impl Machine {
 
         compile_(&mut buf, &mut ident_names, acc, node);
 
+        let max_depth = Self::max_depth(&buf);
+        dbg!(max_depth);
+
         Machine {
             instr: buf,
-            mem: RefCell::new(Vec::with_capacity(16)),
+            mem: RefCell::new(vec![Value::Nil; max_depth]),
             ident_names,
         }
     }
 
+    fn max_depth(buf: &Vec<Instr>) -> usize {
+        buf.iter()
+            .fold((0isize, 0), |(depth, max), i| {
+                let depth = depth
+                    + match i {
+                        Instr::Not => 0,
+
+                        // Pop 2, Push 1
+                        Instr::And
+                        | Instr::Or
+                        | Instr::Match
+                        | Instr::BAnd
+                        | Instr::Ge
+                        | Instr::Le
+                        | Instr::Gt
+                        | Instr::Lt => -1,
+
+                        // All loads push 1
+                        _ => 1,
+                    };
+
+                (depth, max.max(depth as usize))
+            })
+            .1
+    }
+
     pub fn eval(&self, a: &dyn KeyAccessor) -> bool {
-        fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> Option<bool> {
+        fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> bool {
             let mut mem = mach.mem.borrow_mut();
-            mem.clear();
+            let mut cur = 0isize;
+
+            macro_rules! push {
+                ($e:expr) => {
+                    {
+                        // if mem.len() > cur as usize {
+                            unsafe {
+                                let ptr = mem.as_mut_ptr();
+                                let ptr = ptr.offset(cur);
+                                cur += 1;
+                                ptr.write($e);
+                            }
+                        // }
+                    }
+                }
+            }
+
+            macro_rules! pop {
+                () => {{
+                    // if cur != 0 {
+                    unsafe {
+                        let ptr = mem.as_mut_ptr();
+                        cur -= 1;
+                        let ptr = ptr.offset(cur);
+                        let x = ptr.read();
+                        ptr.write(Value::Nil);
+                        x
+                    }
+                    // } else {
+                    //     Value::Nil
+                    // }
+                }};
+            }
 
             for i in mach.instr.iter() {
                 match i {
                     Instr::LoadIdent(x) => {
                         if let Some(i) = a.get_num(*x, 0) {
-                            mem.push(Value::Int(i))
+                            push!(Value::Int(i))
                         } else if let Some(s) = a.get_str(*x, 0) {
-                            mem.push(Value::Str(s))
+                            push!(Value::Str(s))
                         } else {
-                            mem.push(Value::Nil)
+                            push!(Value::Nil)
                         }
                     }
                     Instr::LoadIndexIdent(x, i) => {
                         if let Some(j) = a.get_num(*x, *i) {
-                            mem.push(Value::Int(j))
+                            push!(Value::Int(j))
                         } else if let Some(s) = a.get_str(*x, *i) {
-                            mem.push(Value::Str(s))
+                            push!(Value::Str(s))
                         } else {
-                            mem.push(Value::Nil)
+                            push!(Value::Nil)
                         }
                     }
                     Instr::LoadArrayIdentLen(x) => {
                         if let Some(l) = a.get_len(*x) {
-                            mem.push(Value::Int(l));
+                            push!(Value::Int(l));
                         } else {
-                            mem.push(Value::Nil);
+                            push!(Value::Nil);
                         }
                     }
 
-                    Instr::LoadString(x) => mem.push(Value::Str(x.clone())),
-                    Instr::LoadNum(x) => mem.push(Value::Int(*x)),
-                    Instr::LoadRe(x) => mem.push(Value::Re(x.clone())),
-                    Instr::LoadNil => mem.push(Value::Nil),
+                    Instr::LoadString(x) => push!(Value::Str(x.clone())),
+                    Instr::LoadNum(x) => push!(Value::Int(*x)),
+                    Instr::LoadRe(x) => push!(Value::Re(x.clone())),
+                    Instr::LoadNil => push!(Value::Nil),
 
                     Instr::Not => {
-                        let e = mem.pop()?;
-                        mem.push((!e.as_bool()).into());
+                        let e = pop!();
+                        push!((!e.as_bool()).into());
                     }
 
                     Instr::Eq => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l == r).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l == r).into());
                     }
 
                     Instr::Gt => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l > r).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l > r).into());
                     }
                     Instr::Ge => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l >= r).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l >= r).into());
                     }
                     Instr::Lt => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l < r).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l < r).into());
                     }
                     Instr::Le => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l <= r).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l <= r).into());
                     }
 
                     // Yes, there is no short-circuit here...
                     Instr::And => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l.as_bool() && r.as_bool()).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l.as_bool() && r.as_bool()).into());
                     }
                     Instr::Or => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l.as_bool() || r.as_bool()).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l.as_bool() || r.as_bool()).into());
                     }
 
                     Instr::BAnd => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
-                        mem.push((l.as_int() & r.as_int()).into());
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l.as_int() & r.as_int()).into());
                     }
                     Instr::Match => {
-                        let r = mem.pop()?;
-                        let l = mem.pop()?;
+                        let r = pop!();
+                        let l = pop!();
                         if matches!(l, Value::Str(_)) {
-                            mem.push((r.re_matches(l.as_str())).into());
+                            push!((r.re_matches(l.as_str())).into());
                         } else {
-                            mem.push(false.into());
+                            push!(false.into());
                         }
                     }
                 }
             }
 
-            assert_eq!(mem.len(), 1);
-
-            mem.pop().map(|x| x.as_bool())
+            pop!().as_bool()
         }
 
-        match eval_(self, a) {
-            Some(r) => r,
-            _ => {
-                eprintln!("Could not evaluate expression");
-                false
-            }
-        }
+        eval_(self, a)
     }
 }
