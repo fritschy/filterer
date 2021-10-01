@@ -12,7 +12,7 @@ use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
 
 use crate::sema;
-use nom::error::{ErrorKind};
+use nom::error::{ErrorKind, context};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -183,16 +183,11 @@ pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
 
         e => {
             // Do something ...
-            let fe = e.finish();
-            match &fe {
-                Err(e) => {
-                    let ei = &e.input;
-                    let sei = ei as &str;
-                    let pos = i.as_bytes().offset(sei.as_bytes());
-                    return Err(ParseError::new(i, pos, format!("Error at offset {}", pos)));
-                }
-                _ => unreachable!(),
-            }
+            let fe = e.finish().err().unwrap();
+            let ei = &fe.input;
+            let sei = ei as &str;
+            let pos = i.as_bytes().offset(sei.as_bytes());
+            return Err(ParseError::new(i, pos, format!("Error at offset {}", pos)));
         }
     }
 }
@@ -389,8 +384,8 @@ fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
     let (i, _) = multispace0(i)?;
-    if let Ok((i, index)) = delimited(tag("["), alt((hexnum, octnum, binnum, decnum)), tag("]"))(i) {
-        let num = parse_num(index).map_err(|_| nom::Err::Error(nom::error::Error::new(i, ErrorKind::Digit)))?;
+    if let Ok((i, index)) = delimited(tag("["), context("parse number", alt((hexnum, octnum, binnum, decnum))), tag("]"))(i) {
+        let num = parse_num(index).map_err(|_| nom::Err::Failure(nom::error::Error::new(i, ErrorKind::Digit)))?;
         return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
     } else if let Ok((i, _)) = dot_len(i) {
         return Ok((i, Node::from_array_identifier_len(ident)));
@@ -402,7 +397,7 @@ fn dot_len(i: Input) -> IResult<Input, ()> {
     let (i, _) = multispace0(i)?;
     let (i, _) = tag(".")(i)?;
     let (i, _) = multispace0(i)?;
-    let (i, _) = tag("len")(i)?;
+    let (i, _) = context("parse array len", tag("len"))(i)?;
     Ok((i, ()))
 }
 
@@ -445,8 +440,8 @@ fn binnum(i: Input) -> IResult<Input, Input> {
 }
 
 fn depth(i: Input, d: usize) -> Result<usize, nom::Err<nom::error::Error<Input>>> {
-    if d > 200 { // this should be plenty!
-        fail::<Input, usize, _>(i)?;
+    if d > 1000 { // this should be plenty!
+        context("recursion depth", fail::<Input, usize, _>)(i)?;
     }
     Ok(d+1)
 }
