@@ -252,6 +252,7 @@ const DATA2: &[Item] = &[
     Item(6, "sechs", 0x101),
     Item(7, "sieben", 0x104),
     Item(8, "acht", 0x102),
+    Item(9, "neun\n\tzehn", 0x700),
 ];
 
 struct Data2;
@@ -293,6 +294,8 @@ fn comprehensive_data() {
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
         u & 0x100 != 0 && i < 7
     });
+    compare2("s =~ /\\n/", |&&Item(_, s, _)| re("\n").is_match(s));
+    compare2("s =~ /\\t/", |&&Item(_, s, _)| re("\t").is_match(s));
 }
 
 #[test]
