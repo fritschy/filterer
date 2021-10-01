@@ -237,37 +237,33 @@ impl Machine {
     pub fn eval(&self, a: &dyn KeyAccessor) -> bool {
         fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> bool {
             let mut mem = mach.mem.borrow_mut();
-            let mut cur = 0isize;
+            let stack_size = mem.len();
+            let mut cur = 0;
+            let ptr = mem.as_mut_ptr();
 
             macro_rules! push {
                 ($e:expr) => {
                     {
-                        // if mem.len() > cur as usize {
-                            unsafe {
-                                let ptr = mem.as_mut_ptr();
-                                let ptr = ptr.offset(cur);
-                                cur += 1;
-                                ptr.write($e);
-                            }
-                        // }
+                        debug_assert!((cur as usize) < stack_size);
+                        unsafe {
+                            let ptr = ptr.add(cur);
+                            cur += 1;
+                            ptr.write($e);
+                        }
                     }
-                }
+                };
             }
 
             macro_rules! pop {
                 () => {{
-                    // if cur != 0 {
+                    debug_assert!(cur != 0);
                     unsafe {
-                        let ptr = mem.as_mut_ptr();
                         cur -= 1;
-                        let ptr = ptr.offset(cur);
+                        let ptr = ptr.add(cur);
                         let x = ptr.read();
                         ptr.write(Value::Nil);
                         x
                     }
-                    // } else {
-                    //     Value::Nil
-                    // }
                 }};
             }
 
