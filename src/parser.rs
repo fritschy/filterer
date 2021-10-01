@@ -7,12 +7,13 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
 use nom::character::{is_alphanumeric, is_digit, is_hex_digit, is_oct_digit};
 use nom::character::complete::{multispace0, satisfy};
-use nom::combinator::{eof, map, opt, peek, recognize};
+use nom::combinator::{eof, map, opt, peek, recognize, fail};
 use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
 
 use crate::sema;
-use nom::error::{ErrorKind, Error};
+use nom::error::{ErrorKind};
+use nom::Err::Error;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -171,10 +172,6 @@ impl<'a> fmt::Display for ParseError<'a> {
 }
 
 pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
-    if i.len() > 2048 {
-        return Err(ParseError::new(i, 0, "Input too long!".to_string()));
-    }
-
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?
@@ -203,7 +200,7 @@ pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
 
 // parse_expr = { SOI ~ simple_expr ~ ws* ~ EOI }
 fn parse_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    let (i, e) = simple_expr(i)?;
+    let (i, e) = simple_expr(0)(i)?;
     let (i, _) = multispace0(i)?;
     let (i, _) = eof(i)?;
     Ok((i, e))
@@ -233,61 +230,79 @@ fn generic_expr<'a>(
     }
 }
 
-fn simple_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    generic_expr(
-        &mut move |i| map(tag("||"), BinaryOp::from)(i),
-        &move |i| and_expr(i),
-        i,
-    )
+fn simple_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(tag("||"), BinaryOp::from)(i),
+            &move |i| and_expr(d)(i),
+            i,
+        )
+    }
 }
 
-fn and_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    generic_expr(
-        &mut move |i| map(tag("&&"), BinaryOp::from)(i),
-        &move |i| rel_expr(i),
-        i,
-    )
+fn and_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(tag("&&"), BinaryOp::from)(i),
+            &move |i| rel_expr(d)(i),
+            i,
+        )
+    }
 }
 
-fn rel_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    generic_expr(
-        &mut move |i| map(relop, BinaryOp::from)(i),
-        &move |i| sum_expr(i),
-        i,
-    )
+fn rel_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(relop, BinaryOp::from)(i),
+            &move |i| sum_expr(d)(i),
+            i,
+        )
+    }
 }
 
-fn sum_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    generic_expr(
-        &mut move |i| map(tag("&"), BinaryOp::from)(i),
-        &move |i| unary_expr(i),
-        i,
-    )
+fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(tag("&"), BinaryOp::from)(i),
+            &move |i| unary_expr(d)(i),
+            i,
+        )
+    }
 }
 
 // unary_expr = { ws* ~ ("!" | "-")? ~ factor }
-fn unary_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    let (i, _) = multispace0(i)?;
-    let (i, op) = opt(map(tag("!"), UnaryOp::from))(i)?;
-    let (i, ue) = factor(i)?;
+fn unary_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        let (i, _) = multispace0(i)?;
+        let (i, op) = opt(map(tag("!"), UnaryOp::from))(i)?;
+        let (i, ue) = factor(d)(i)?;
 
-    if let Some(op) = op {
-        Ok((i, Node::new_unary(op, ue)))
-    } else {
-        Ok((i, ue))
+        if let Some(op) = op {
+            Ok((i, Node::new_unary(op, ue)))
+        } else {
+            Ok((i, ue))
+        }
     }
 }
 
 // factor = { ws* ~ (identifier | numeric | string | parens_expr) }
-fn factor(i: Input) -> IResult<Input, Rc<Node>> {
-    let (i, _) = multispace0(i)?;
-    alt((
-        identifier,
-        numeric,
-        string("\"", &Node::from_string),
-        string("/", &Node::from_regexp),
-        parens_expr,
-    ))(i)
+fn factor(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        let (i, _) = multispace0(i)?;
+        alt((
+            identifier,
+            numeric,
+            string("\"", &Node::from_string),
+            string("/", &Node::from_regexp),
+            parens_expr(d),
+        ))(i)
+    }
 }
 
 // FIXME: this one sucks particularly HARD
@@ -346,9 +361,12 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
 }
 
 // parens_expr = { ws* ~ "(" ~ simple_expr ~ ")" }
-fn parens_expr(i: Input) -> IResult<Input, Rc<Node>> {
-    let (i, _) = multispace0(i)?;
-    delimited(tag("("), simple_expr, tag(")"))(i)
+fn parens_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        let (i, _) = multispace0(i)?;
+        delimited(tag("("), simple_expr(d), tag(")"))(i)
+    }
 }
 
 fn relop(i: Input) -> IResult<Input, BinaryOp> {
@@ -373,7 +391,7 @@ fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
     let (i, _) = multispace0(i)?;
     if let Ok((i, index)) = delimited(tag("["), alt((hexnum, octnum, binnum, decnum)), tag("]"))(i) {
-        let num = parse_num(index).map_err(|_| nom::Err::Error(Error::new(i, ErrorKind::Digit)))?;
+        let num = parse_num(index).map_err(|_| nom::Err::Error(nom::error::Error::new(i, ErrorKind::Digit)))?;
         return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
     } else if let Ok((i, _)) = dot_len(i) {
         return Ok((i, Node::from_array_identifier_len(ident)));
@@ -425,4 +443,11 @@ fn octnum(i: Input) -> IResult<Input, Input> {
 
 fn binnum(i: Input) -> IResult<Input, Input> {
     prefixed_num(Some("0b"), |x| x == b'0' || x == b'1', i)
+}
+
+fn depth(i: Input, d: usize) -> Result<usize, nom::Err<nom::error::Error<Input>>> {
+    if d > 200 { // this should be plenty!
+        fail::<Input, usize, _>(i)?;
+    }
+    Ok(d+1)
 }
