@@ -199,7 +199,6 @@ impl Machine {
         compile_(&mut buf, &mut ident_names, acc, node);
 
         let max_depth = Self::max_depth(&buf);
-        dbg!(max_depth);
 
         Machine {
             instr: buf,
