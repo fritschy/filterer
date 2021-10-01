@@ -2,9 +2,11 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use crate::machine::{Machine, KeyAccessor, AccessorQuery};
+use crate::machine::{KeyAccessor, AccessorQuery};
 use crate::parser::parse;
 use crate::value::{Value, parse_num};
+
+use crate::compile;
 
 type Data = &'static str;
 
@@ -47,10 +49,9 @@ impl AccessorQuery for DataQuery {
 
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
-    if let Err(p) = parse(expr).map(|p| {
+    if let Err(p) = compile(expr, &DataQuery).map(|machine| {
         let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node_and_accessor(p.as_ref(), &DataQuery);
         println!("Code:\n{}", &machine);
         let d = DATA
             .iter()
@@ -89,8 +90,7 @@ fn check(expr: &str, exp: bool) {
         }
     }
     const DATA0: X = X;
-    let node = parse(expr).unwrap();
-    let machine = Machine::from_node_and_accessor(node.as_ref(), &X);
+    let machine = compile(expr, &X).unwrap();
     println!("Code:\n{}", &machine);
     assert_eq!(machine.eval(&DATA0), exp);
 }
@@ -110,6 +110,8 @@ fn always_true() {
     check("d == d", true);
     check("!\"0\"", true);
     check("\"1\"", true);
+    check("\"\\\"\\r\\n\\t\\0\"", true);
+    check("/\\/\\r\\n\\t\\0/", false);
 }
 
 #[test]
@@ -131,9 +133,54 @@ fn always_false() {
 }
 
 #[test]
+fn one_array_only() {
+    fn check(expr: &str, f: impl Fn(&&Data) -> bool) {
+        struct X;
+        impl KeyAccessor for X {
+            fn get_str(&self, n: usize, i: usize) -> Option<Rc<String>> {
+                if n == 0 && i < DATA.len() {
+                    return Some(Rc::new(DATA[i].to_string()));
+                }
+                None
+            }
+            fn get_num(&self, _: usize, _: usize) -> Option<isize> {
+                None
+            }
+            fn get_len(&self, n: usize) -> Option<isize> {
+                if n == 0 {
+                    return Some(DATA.len() as isize);
+                }
+                None
+            }
+        }
+        impl AccessorQuery for X {
+            fn get_ident(&self, name: &str) -> Option<usize> {
+                if name == "d" {
+                    return Some(0);
+                }
+                None
+            }
+        }
+
+        let machine = compile(expr, &X).unwrap();
+        println!("Code:\n{}", &machine);
+
+        let x = DATA.iter().filter(|&x| machine.eval(x)).collect::<Vec<_>>();
+        let expect = DATA.iter().filter(f).collect::<Vec<_>>();
+
+        assert_eq!(expect, x);
+    }
+
+    check("d[0] == 0x100", |&&x| x == "0x100");
+}
+
+#[test]
 fn regexes() {
     compare("d =~ /a/", |x| re("a").is_match(x));
     compare("!(d =~ /a/)", |x| !re("a").is_match(x));
+
+    compare(" d =~ /a/ ", |x| re("a").is_match(x));
+    compare(" ! ( d =~ /a/ ) ", |x| !re("a").is_match(x));
 
     // Invalid regex will be replaced by a not-matching regex
     compare("d =~ /(/", |_| false);
@@ -159,6 +206,9 @@ fn comparisons() {
 
 #[test]
 fn parse_errors() {
+    println!("{:?}", parse("1+2").unwrap_err());
+    println!("{:?}", parse("d =! \"eins\"").unwrap_err());
+
     println!("{}", parse("1+2").unwrap_err().describe());
     println!("{}", parse("d =! \"eins\"").unwrap_err().describe());
     println!("{}", parse("d !& \"eins\"").unwrap_err().describe());
@@ -166,6 +216,8 @@ fn parse_errors() {
     println!("{}", parse(")").unwrap_err().describe());
     println!("{}", parse("\"").unwrap_err().describe());
     println!("{}", parse("flags && flags &").unwrap_err().describe());
+    println!("{}", parse("\0").unwrap_err().describe());
+    println!("{}", parse("(".repeat(500).as_str()).unwrap_err().describe());
     println!(
         "{}",
         parse("flags & 0x700 <= 0x300 || (ts >= 1000 && ts < 100000f)")
@@ -269,10 +321,9 @@ impl AccessorQuery for Data2 {
 }
 
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
-    if let Err(p) = parse(expr).map(|p| {
+    if let Err(p) = compile(expr, &Data2).map(|machine| {
         let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node_and_accessor(p.as_ref(), &Data2);
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
@@ -354,10 +405,9 @@ fn arrays() {
             D{i: 5, a: vec![42]},
         ];
 
-        if let Err(p) = parse(expr).map(|p| {
+        if let Err(p) = compile(expr, &DataD).map(|machine| {
             let expect = data.iter().filter(f).map(|m| m).collect::<Vec<_>>();
 
-            let machine = Machine::from_node_and_accessor(p.as_ref(), &DataD);
             println!("Code:\n{}", &machine);
             let d = data
                 .iter()
@@ -375,6 +425,7 @@ fn arrays() {
     compare("a[0o3]", |x| x.a.len() > 3 && x.a[3] > 0);
     compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
     compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
+    compare("b[0x10000]", |_| false);
     compare("a[0x10000]", |_| false);
     compare("a[0x10000] == a[0x10000]", |_| false);
     compare("a.len > 1", |x| x.a.len() > 1);
@@ -394,4 +445,5 @@ fn arrays() {
     println!("{}", parse("a[10].len").unwrap_err().describe());
     println!("{}", parse("a.length").unwrap_err().describe());
     println!("{}", parse("a.len()").unwrap_err().describe());
+    println!("{}", parse("a[7777777777777777777777777]").unwrap_err().describe());
 }
