@@ -88,7 +88,7 @@ impl From<BinaryOp> for Instr {
             BinaryOp::Lt => Instr::Lt,
             BinaryOp::Match => Instr::Match,
             BinaryOp::Band => Instr::BAnd,
-            _ => unreachable!("Unmapped operator"),
+            BinaryOp::Ne => unreachable!("ne operator needs to be mapped to !eq"),
         }
     }
 }
@@ -101,14 +101,14 @@ impl From<UnaryOp> for Instr {
     }
 }
 
-impl From<&Node> for Instr {
-    fn from(node: &Node) -> Self {
+impl Instr {
+    fn from_terminal_node(node: &Node) -> Self {
         match node {
             Node::StringLiteral(s) => Instr::LoadString(s.clone()),
             Node::Constant(i) => Instr::LoadNum(*i),
             Node::Regexp(r) => Instr::LoadRe(r.clone()),
             Node::Nil => Instr::LoadNil,
-            _ => unreachable!(),
+            _ => panic!("Unexpected node type"),
         }
     }
 }
@@ -189,7 +189,7 @@ impl Machine {
                     }
                 }
 
-                _ => buf.push(node.into()),
+                _ => buf.push(Instr::from_terminal_node(node)),
             }
         }
 
