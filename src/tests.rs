@@ -356,7 +356,7 @@ fn arrays() {
         a: Vec<isize>,
     }
 
-    impl KeyAccessor for &D {
+    impl KeyAccessor for D {
         fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
             None
         }
@@ -410,7 +410,7 @@ fn arrays() {
             println!("Code:\n{}", &machine);
             let d = data
                 .iter()
-                .filter(|x| machine.eval(x))
+                .filter(|x| machine.eval(*x))
                 .collect::<Vec<_>>();
             assert_eq!(d, expect);
         }) {
