@@ -4,13 +4,24 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use crate::eval::{Accessor, Value};
 use crate::parser::{BinaryOp, Node, UnaryOp};
+use crate::value::Value;
+
+pub trait KeyAccessor {
+    fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>>;
+    fn get_num(&self, k: usize, i: usize) -> Option<isize>;
+    fn get_len(&self, k: usize) -> Option<isize>;
+}
+
+pub trait AccessorQuery {
+    fn get_ident(&self, name: &str) -> Option<usize>;
+}
 
 pub enum Instr {
-    LoadIdent(Rc<String>),
-    LoadIndexIdent(Rc<String>, usize),
-    LoadArrayIdentLen(Rc<String>),
+    LoadIdent(usize),
+    LoadIndexIdent(usize, usize),
+    LoadArrayIdentLen(usize),
+
     LoadString(Rc<String>),
     LoadNum(isize),
     LoadRe(Rc<Regex>),
@@ -33,6 +44,7 @@ impl fmt::Display for Instr {
             Instr::LoadIdent(x) => write!(f, "load ident {}", *x),
             Instr::LoadIndexIdent(x, i) => write!(f, "load ident {}[{}]", *x, *i),
             Instr::LoadArrayIdentLen(x) => write!(f, "load ident {}.len", *x),
+
             Instr::LoadString(x) => write!(f, "load string \"{}\"", *x),
             Instr::LoadNum(x) => write!(f, "load num {}", x),
             Instr::LoadRe(x) => write!(f, "load re /{:?}/", *x),
@@ -80,9 +92,6 @@ impl From<&Node> for Instr {
     fn from(node: &Node) -> Self {
         match node {
             Node::StringLiteral(s) => Instr::LoadString(s.clone()),
-            Node::Identifier(s) => Instr::LoadIdent(s.clone()),
-            Node::IndexedIdentifier(s, i) => Instr::LoadIndexIdent(s.clone(), *i),
-            Node::ArrayIdentifierLen(s) => Instr::LoadArrayIdentLen(s.clone()),
             Node::Constant(i) => Instr::LoadNum(*i),
             Node::Regexp(r) => Instr::LoadRe(r.clone()),
             Node::Nil => Instr::LoadNil,
@@ -105,13 +114,13 @@ impl fmt::Display for Machine {
 }
 
 impl Machine {
-    pub fn from_node(node: &Node) -> Machine {
-        fn compile_(buf: &mut Vec<Instr>, node: &Node) {
+    pub fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Machine {
+        fn compile_(buf: &mut Vec<Instr>, acc: &dyn AccessorQuery, node: &Node) {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
-                    compile_(buf, lhs.as_ref());
-                    compile_(buf, rhs.as_ref());
+                    compile_(buf, acc, lhs.as_ref());
+                    compile_(buf, acc, rhs.as_ref());
                     if matches!(op, BinaryOp::Ne) {
                         buf.push(BinaryOp::Eq.into());
                         buf.push(UnaryOp::Not.into());
@@ -121,8 +130,35 @@ impl Machine {
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, expr.as_ref());
+                    compile_(buf, acc, expr.as_ref());
                     buf.push((*op).into());
+                }
+
+                Node::Identifier(x) => {
+                    if let Some(ik) = acc.get_ident(x) {
+                        buf.push(Instr::LoadIdent(ik))
+                    } else {
+                        eprintln!("Could not lookup ident '{}', emitting 'load nil'", x);
+                        buf.push(Instr::LoadNil)
+                    }
+                }
+
+                Node::IndexedIdentifier(x, i) => {
+                    if let Some(ik) = acc.get_ident(x) {
+                        buf.push(Instr::LoadIndexIdent(ik, *i))
+                    } else {
+                        eprintln!("Could not lookup index ident '{}', emitting 'load nil'", x);
+                        buf.push(Instr::LoadNil)
+                    }
+                }
+
+                Node::ArrayIdentifierLen(x) => {
+                    if let Some(ik) = acc.get_ident(x) {
+                        buf.push(Instr::LoadArrayIdentLen(ik))
+                    } else {
+                        eprintln!("Could not lookup array len ident '{}', emitting 'load nil'", x);
+                        buf.push(Instr::LoadNil)
+                    }
                 }
 
                 _ => buf.push(node.into()),
@@ -130,40 +166,42 @@ impl Machine {
         }
 
         let mut buf = Vec::with_capacity(32);
-        compile_(&mut buf, node);
+
+        compile_(&mut buf, acc, node);
+
         Machine {
             instr: buf,
             mem: RefCell::new(Vec::with_capacity(16)),
         }
     }
 
-    pub fn eval(&self, a: &dyn Accessor) -> bool {
-        fn eval_(mach: &Machine, a: &dyn Accessor) -> Option<bool> {
+    pub fn eval(&self, a: &dyn KeyAccessor) -> bool {
+        fn eval_(mach: &Machine, a: &dyn KeyAccessor) -> Option<bool> {
             let mut mem = mach.mem.borrow_mut();
             mem.clear();
 
             for i in mach.instr.iter() {
                 match i {
                     Instr::LoadIdent(x) => {
-                        if let Some(i) = a.get_num(x, 0) {
+                        if let Some(i) = a.get_num(*x, 0) {
                             mem.push(Value::Int(i))
-                        } else if let Some(s) = a.get_str(x, 0) {
+                        } else if let Some(s) = a.get_str(*x, 0) {
                             mem.push(Value::Str(s))
                         } else {
                             mem.push(Value::Nil)
                         }
                     }
                     Instr::LoadIndexIdent(x, i) => {
-                        if let Some(i) = a.get_num(x, *i) {
-                            mem.push(Value::Int(i))
-                        } else if let Some(s) = a.get_str(x, *i) {
+                        if let Some(j) = a.get_num(*x, *i) {
+                            mem.push(Value::Int(j))
+                        } else if let Some(s) = a.get_str(*x, *i) {
                             mem.push(Value::Str(s))
                         } else {
                             mem.push(Value::Nil)
                         }
                     }
                     Instr::LoadArrayIdentLen(x) => {
-                        if let Some(l) = a.get_len(x) {
+                        if let Some(l) = a.get_len(*x) {
                             mem.push(Value::Int(l));
                         } else {
                             mem.push(Value::Nil);

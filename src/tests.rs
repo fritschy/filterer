@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use crate::eval::*;
-use crate::machine::Machine;
+use crate::machine::{Machine, KeyAccessor, AccessorQuery};
 use crate::parser::parse;
+use crate::value::{Value, parse_num};
 
 type Data = &'static str;
 
@@ -20,20 +20,29 @@ const DATA: &[Data] = &[
     "\"\\\"moo\\\"\n\t\\v\r\\f",
 ];
 
-impl Accessor for Data {
-    fn get_str(&self, k: &str, _i: usize) -> Option<Rc<String>> {
-        if k == "d" {
-            Some(Rc::new(String::from(*self)))
-        } else {
-            None
-        }
+impl KeyAccessor for Data {
+    fn get_str(&self, _: usize, _i: usize) -> Option<Rc<String>> {
+        Some(Rc::new(String::from(*self)))
     }
 
-    fn get_num(&self, _: &str, _: usize) -> Option<isize> {
+    fn get_num(&self, _: usize, _: usize) -> Option<isize> {
         None
     }
 
-    fn get_len(&self, _: &str) -> Option<isize> { None }
+    fn get_len(&self, _: usize) -> Option<isize> {
+        None
+    }
+}
+
+struct DataQuery;
+
+impl AccessorQuery for DataQuery {
+    fn get_ident(&self, name: &str) -> Option<usize> {
+        if name == "d" {
+            return Some(0);
+        }
+        None
+    }
 }
 
 // Compare expr filter with iter filter
@@ -41,7 +50,7 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
         let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node(p.as_ref());
+        let machine = Machine::from_node_and_accessor(p.as_ref(), &DataQuery);
         println!("Code:\n{}", &machine);
         let d = DATA
             .iter()
@@ -60,18 +69,28 @@ fn re(s: &str) -> Regex {
 
 fn check(expr: &str, exp: bool) {
     struct X;
-    impl Accessor for X {
-        fn get_str(&self, _: &str, _: usize) -> Option<Rc<String>> {
+    impl KeyAccessor for X {
+        fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
             Some(Rc::new(String::from("1")))
         }
-        fn get_num(&self, _: &str, _: usize) -> Option<isize> {
+        fn get_num(&self, _: usize, _: usize) -> Option<isize> {
             Some(1)
         }
-        fn get_len(&self, _: &str) -> Option<isize> { None }
+        fn get_len(&self, _: usize) -> Option<isize> {
+            None
+        }
+    }
+    impl AccessorQuery for X {
+        fn get_ident(&self, name: &str) -> Option<usize> {
+            if name == "d" {
+                return Some(0);
+            }
+            None
+        }
     }
     const DATA0: X = X;
     let node = parse(expr).unwrap();
-    let machine = Machine::from_node(node.as_ref());
+    let machine = Machine::from_node_and_accessor(node.as_ref(), &X);
     println!("Code:\n{}", &machine);
     assert_eq!(machine.eval(&DATA0), exp);
 }
@@ -204,23 +223,23 @@ fn mixing_types() {
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct Item(isize, &'static str, isize);
 
-impl Accessor for Item {
-    fn get_str(&self, k: &str, _i: usize) -> Option<Rc<String>> {
+impl KeyAccessor for Item {
+    fn get_str(&self, k: usize, _i: usize) -> Option<Rc<String>> {
         match k {
-            "s" => Some(Rc::new(String::from(self.1))),
+            1 => Some(Rc::new(String::from(self.1))),
             _ => None,
         }
     }
 
-    fn get_num(&self, k: &str, _i: usize) -> Option<isize> {
+    fn get_num(&self, k: usize, _i: usize) -> Option<isize> {
         match k {
-            "i" => Some(self.0),
-            "u" => Some(self.2),
+            0 => Some(self.0),
+            2 => Some(self.2),
             _ => None,
         }
     }
 
-    fn get_len(&self, _: &str) -> Option<isize> { None }
+    fn get_len(&self, _: usize) -> Option<isize> { None }
 }
 
 const DATA2: &[Item] = &[
@@ -235,11 +254,24 @@ const DATA2: &[Item] = &[
     Item(8, "acht", 0x102),
 ];
 
+struct Data2;
+
+impl AccessorQuery for Data2 {
+    fn get_ident(&self, name: &str) -> Option<usize> {
+        match name {
+            "s" => Some(1),
+            "u" => Some(2),
+            "i" => Some(0),
+            _ => None,
+        }
+    }
+}
+
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = parse(expr).map(|p| {
         let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
 
-        let machine = Machine::from_node(p.as_ref());
+        let machine = Machine::from_node_and_accessor(p.as_ref(), &Data2);
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
@@ -256,6 +288,7 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 fn comprehensive_data() {
     compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
     compare2("s =~ !/[es]/", |&&Item(_, s, _)| !re("[es]").is_match(s));
+    // watch out for the infamous ü-separated values!!1
     compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
         u & 0x100 != 0 && i < 7
@@ -270,22 +303,40 @@ fn arrays() {
         a: Vec<isize>,
     }
 
-    impl Accessor for D {
-        fn get_str(&self, _: &str, _: usize) -> Option<Rc<String>> {
+    impl KeyAccessor for D {
+        fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
             None
         }
 
-        fn get_num(&self, k: &str, i: usize) -> Option<isize> {
+        fn get_num(&self, k: usize, i: usize) -> Option<isize> {
             match (k, i) {
-                ("i", _) => Some(self.i),
-                ("a", i) if i < self.a.len() => Some(self.a[i]),
+                (0, _) => Some(self.i),
+                (1, i) => {
+                    if i < self.a.len() {
+                        Some(self.a[i])
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             }
         }
 
-        fn get_len(&self, k: &str) -> Option<isize> {
+        fn get_len(&self, k: usize) -> Option<isize> {
             match k {
-                "a" => Some(self.a.len() as isize),
+                1 => Some(self.a.len() as isize),
+                _ => None,
+            }
+        }
+    }
+
+    struct DataD;
+
+    impl AccessorQuery for DataD {
+        fn get_ident(&self, name: &str) -> Option<usize> {
+            match name {
+                "i" => Some(0),
+                "a" => Some(1),
                 _ => None,
             }
         }
@@ -303,7 +354,7 @@ fn arrays() {
         if let Err(p) = parse(expr).map(|p| {
             let expect = data.iter().filter(f).map(|m| m).collect::<Vec<_>>();
 
-            let machine = Machine::from_node(p.as_ref());
+            let machine = Machine::from_node_and_accessor(p.as_ref(), &DataD);
             println!("Code:\n{}", &machine);
             let d = data
                 .iter()

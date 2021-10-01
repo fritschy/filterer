@@ -13,8 +13,8 @@
 // How to implement chaining of logic operators, i.e. EXPR && EXPR?
 
 mod sema;
+mod value;
 
-pub mod eval;
 pub mod parser;
 pub mod machine;
 
