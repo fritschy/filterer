@@ -126,7 +126,7 @@ impl fmt::Display for Machine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.instr
             .iter()
-            .try_for_each(|instr| writeln!(f, "{}", NamedInstr(&instr, &self.ident_names)))
+            .try_for_each(|instr| writeln!(f, "{}", NamedInstr(instr, &self.ident_names)))
     }
 }
 
@@ -158,7 +158,7 @@ impl Machine {
 
                 Node::Identifier(x) => {
                     if let Some(ik) = acc.get_ident(x) {
-                        ident_names.entry(ik).or_insert(x.to_string());
+                        ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadIdent(ik))
                     } else {
                         eprintln!("Could not lookup ident '{}', emitting 'load nil'", x);
@@ -168,7 +168,7 @@ impl Machine {
 
                 Node::IndexedIdentifier(x, i) => {
                     if let Some(ik) = acc.get_ident(x) {
-                        ident_names.entry(ik).or_insert(x.to_string());
+                        ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadIndexIdent(ik, *i))
                     } else {
                         eprintln!("Could not lookup index ident '{}', emitting 'load nil'", x);
@@ -178,7 +178,7 @@ impl Machine {
 
                 Node::ArrayIdentifierLen(x) => {
                     if let Some(ik) = acc.get_ident(x) {
-                        ident_names.entry(ik).or_insert(x.to_string());
+                        ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadArrayIdentLen(ik))
                     } else {
                         eprintln!(
@@ -207,7 +207,7 @@ impl Machine {
         }
     }
 
-    fn max_depth(buf: &Vec<Instr>) -> usize {
+    fn max_depth(buf: &[Instr]) -> usize {
         buf.iter()
             .fold((0isize, 0), |(depth, max), i| {
                 let depth = depth
