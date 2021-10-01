@@ -13,7 +13,6 @@ use nom::sequence::{delimited, preceded};
 
 use crate::sema;
 use nom::error::{ErrorKind};
-use nom::Err::Error;
 
 #[derive(Debug, Clone)]
 pub enum Node {

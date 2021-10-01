@@ -18,7 +18,7 @@ pub trait AccessorQuery {
     fn get_ident(&self, name: &str) -> Option<usize>;
 }
 
-pub enum Instr {
+enum Instr {
     LoadIdent(usize),
     LoadIndexIdent(usize, usize),
     LoadArrayIdentLen(usize),
