@@ -170,6 +170,10 @@ impl<'a> fmt::Display for ParseError<'a> {
 }
 
 pub fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
+    if i.len() > 2048 {
+        return Err(ParseError::new(i, 0, format!("Input too long!")));
+    }
+
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?
