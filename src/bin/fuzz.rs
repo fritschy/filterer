@@ -128,26 +128,15 @@ fn messages() -> Vec<Rc<Message>> {
     ]
 }
 
-fn doit(l: &str, bench: bool) {
-    if let Err(e) = compile(l.trim(), &MessageQuery).map(|c| {
-        if !bench {
-            println!("{}", l);
-            println!("Code:\n{}", c);
-        }
+fn doit(l: &str) {
+    if let Err(e) = compile(l, &MessageQuery).map(|c| {
+        println!("Code:\n{}", c);
 
         let mut count = 0;
-        let mut allcount = 0;
-        let max = if bench { 1_000_000 } else { 1 };
         let msgs = messages();
-        for _i in 0..max {
-            for m in msgs.iter() {
-                if c.eval(m.as_ref()) {
-                    if !bench {
-                        println!("{} {}", allcount, m);
-                    }
-                    count += 1;
-                }
-                allcount += 1;
+        for m in msgs.iter() {
+            if c.eval(m.as_ref()) {
+                count += 1;
             }
         }
 
@@ -160,6 +149,6 @@ fn doit(l: &str, bench: bool) {
 fn main() {
     fuzz!(|data: &[u8]| {
         let text = String::from_utf8_lossy(data);
-        doit(&text, false);
+        doit(&text);
     });
 }
