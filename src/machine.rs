@@ -356,6 +356,16 @@ impl Machine {
                         let l = pop!();
                         push!((l.as_int() & r.as_int()).into());
                     }
+
+                    // We do not want to fuzz the regex crate.
+                    #[cfg(feature = "fuzz")]
+                    Instr::Match => {
+                        let _r = pop!();
+                        let _l = pop!();
+                        push!(false.into());
+                    }
+
+                    #[cfg(not(feature = "fuzz"))]
                     Instr::Match => {
                         let r = pop!();
                         let l = pop!();
