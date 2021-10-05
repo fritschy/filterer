@@ -123,6 +123,16 @@ impl Node {
         Rc::new(Node::StringLiteral(Rc::new(i.to_string())))
     }
 
+    #[cfg(feature = "fuzz")]
+    fn from_regexp(_: Input) -> Rc<Node> {
+        if let Ok(re) = regex::Regex::new("") {
+            Rc::new(Node::Regexp(Rc::new(re)))
+        } else {
+            Rc::new(Node::Nil)
+        }
+    }
+
+    #[cfg(not(feature = "fuzz"))]
     fn from_regexp(i: Input) -> Rc<Node> {
         if let Ok(re) = regex::Regex::new(i) {
             Rc::new(Node::Regexp(Rc::new(re)))
