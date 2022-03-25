@@ -354,11 +354,16 @@ fn arrays() {
     struct D {
         i: isize,
         a: Vec<isize>,
+        s: Vec<String>,
     }
 
     impl KeyAccessor for D {
-        fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
-            None
+        fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>> {
+            if k == 2 && i < self.s.len() {
+                Some(Rc::new(self.s[i].clone()))
+            } else {
+                None
+            }
         }
 
         fn get_num(&self, k: usize, i: usize) -> Option<isize> {
@@ -378,6 +383,7 @@ fn arrays() {
         fn get_len(&self, k: usize) -> Option<isize> {
             match k {
                 1 => Some(self.a.len() as isize),
+                2 => Some(self.s.len() as isize),
                 _ => None,
             }
         }
@@ -390,6 +396,7 @@ fn arrays() {
             match name {
                 "i" => Some(0),
                 "a" => Some(1),
+                "s" => Some(2),
                 _ => None,
             }
         }
@@ -397,11 +404,11 @@ fn arrays() {
 
     fn compare(expr: &str, f: impl Fn(&&D) -> bool) {
         let data = vec![
-            D{i: 12, a: vec![9, 8, 7]},
-            D{i: 22, a: vec![0, 1, 2, 3, 4]},
-            D{i: 2, a: Vec::new()},
-            D{i: 3, a: vec![4711, 42]},
-            D{i: 5, a: vec![42]},
+            D{i: 12, a: vec![9, 8, 7], s: vec![]},
+            D{i: 22, a: vec![0, 1, 2, 3, 4], s: vec!["moo a".to_string(), "test c".to_string()]},
+            D{i: 2, a: Vec::new(), s: vec!["moo".to_string(), " test ".to_string()]},
+            D{i: 3, a: vec![4711, 42], s: vec![" moo test a ".to_string()]},
+            D{i: 5, a: vec![42], s: vec!["a".to_string(), "b".to_string(), "a b".to_string(), "c".to_string(), "a c".to_string()]},
         ];
 
         if let Err(p) = compile(expr, &DataD).map(|machine| {
@@ -435,6 +442,10 @@ fn arrays() {
     compare("z.len >= 0", |_| false);
     compare("z.len < 0", |_| false);
     compare("z.len == z.len", |_| false);
+    compare("s[0] =~ /a/", |x| x.s.len() >= 1 && x.s[0].contains("a"));
+    compare("s[0] =~ /NOT FOUND/", |_| false);
+    compare("s[0] =~ /moo/", |x| x.s.len() >= 1 && x.s[0].contains("moo"));
+    compare("s[0] =~ !/moo/", |x| x.s.is_empty() || (x.s.len() >= 1 && !x.s[0].contains("moo")));
 
     println!("{}", parse("a[\"non-numeric-index\"] > 0").unwrap_err().describe());
     println!("{}", parse("a[] > 0").unwrap_err().describe());

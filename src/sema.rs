@@ -12,7 +12,9 @@ pub(crate) fn check(node: &Node) -> Result<(), String> {
                         return Err("Match operator needs a right regex argument".to_string());
                     }
                     if !matches!(lhs.as_ref(), Node::Identifier(_))
-                        && !matches!(lhs.as_ref(), Node::StringLiteral(_)) {
+                        && !matches!(lhs.as_ref(), Node::StringLiteral(_))
+                        && !matches!(lhs.as_ref(), Node::IndexedIdentifier(_, _))
+                    {
                         return Err(
                             "Match operator needs a left string or identifier argument".to_string()
                         );
@@ -44,7 +46,9 @@ pub(crate) fn check(node: &Node) -> Result<(), String> {
 fn transform_match_not_regex(node: &Rc<Node>) -> Option<Rc<Node>> {
     if let Node::Binary { lhs, op, rhs } = node.as_ref() {
         if matches!(op, &BinaryOp::Match) &&
-            (matches!(lhs.as_ref(), Node::StringLiteral(_)) || matches!(lhs.as_ref(), Node::Identifier(_))) {
+            (matches!(lhs.as_ref(), Node::StringLiteral(_)) ||
+             matches!(lhs.as_ref(), Node::Identifier(_)) ||
+             matches!(lhs.as_ref(), Node::IndexedIdentifier(_, _))) {
             if let Node::Unary { op: UnaryOp::Not, expr} = rhs.as_ref() {
                 if matches!(expr.as_ref(), Node::Regexp(_)) {
                     let e = Rc::new(Node::Binary {lhs: lhs.clone(), op: *op, rhs: expr.clone() });
