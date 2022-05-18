@@ -124,7 +124,7 @@ impl Node {
     }
 
     #[cfg(feature = "fuzz")]
-    fn from_regexp(_: Input) -> Rc<Node> {
+    fn from_regexp(_: Input, _: bool) -> Rc<Node> {
         if let Ok(re) = regex::Regex::new("") {
             Rc::new(Node::Regexp(Rc::new(re)))
         } else {
@@ -133,8 +133,8 @@ impl Node {
     }
 
     #[cfg(not(feature = "fuzz"))]
-    fn from_regexp(i: Input) -> Rc<Node> {
-        if let Ok(re) = regex::Regex::new(i) {
+    fn from_regexp(i: Input, icase: bool) -> Rc<Node> {
+        if let Ok(re) = regex::RegexBuilder::new(i).case_insensitive(icase).build() {
             Rc::new(Node::Regexp(Rc::new(re)))
         } else {
             Rc::new(Node::Nil)
@@ -302,38 +302,33 @@ fn factor(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
         alt((
             identifier,
             numeric,
-            string("\"", &Node::from_string),
-            string("/", &Node::from_regexp),
+            map(string("\""), Node::from_string),
+            move |i| {
+                let (i, re) = string("/")(i)?;
+                let (i, fl) = opt(tag("i"))(i)?;
+                Ok((i, Node::from_regexp(re, fl.is_some())))
+            },
             parens_expr(d),
         ))(i)
     }
 }
 
-// FIXME: this one sucks particularly HARD
-fn string<'a>(
-    delimiter: Input<'a>,
-    map_to: &'a impl Fn(Input) -> Rc<Node>,
-) -> impl Fn(Input) -> IResult<Input, Rc<Node>> + 'a {
-    move |i| {
-        map(
-            delimited(
-                tag(delimiter),
-                recognize(move |i| {
-                    let mut i = i;
-                    while let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
-                        escaped_char(delimiter),
-                        take_till1(|x| x == '\\' || x as u8 == delimiter.as_bytes()[0]),
-                    ))(i)
-                    {
-                        i = r;
-                    }
-                    Ok((i, ""))
-                }),
-                tag(delimiter),
-            ),
-            map_to,
-        )(i)
-    }
+fn string<'a>(delimiter: Input<'a>) -> impl FnMut(Input<'a>) -> IResult<Input, Input> {
+    delimited(
+        tag(delimiter),
+        recognize(move |i| {
+            let mut i = i;
+            while let Ok((r, _)) = alt::<_, _, nom::error::Error<Input>, _>((
+                escaped_char(delimiter),
+                take_till1(|x| x == '\\' || x as u8 == delimiter.as_bytes()[0]),
+            ))(i)
+            {
+                i = r;
+            }
+            Ok((i, ""))
+        }),
+        tag(delimiter),
+    )
 }
 
 // escaped_char = { "\\" ~ ("\"" | "\\" | "n" | "r" ...) }

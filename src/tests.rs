@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 use crate::compile;
 use crate::machine::{AccessorQuery, KeyAccessor};
@@ -11,6 +11,9 @@ type Data = &'static str;
 
 const DATA: &[Data] = &[
     "abc",
+    "ABC",
+    "CDE",
+    "CDe",
     "cde",
     "ahi",
     "10a",
@@ -64,7 +67,11 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
 }
 
 fn re(s: &str) -> Regex {
-    Regex::new(s).expect("regex")
+    cre(s, false)
+}
+
+fn cre(s: &str, icase: bool) -> Regex {
+    RegexBuilder::new(s).case_insensitive(icase).build().expect("regex")
 }
 
 fn check(expr: &str, exp: bool) {
@@ -177,6 +184,9 @@ fn one_array_only() {
 fn regexes() {
     compare("d =~ /a/", |x| re("a").is_match(x));
     compare("!(d =~ /a/)", |x| !re("a").is_match(x));
+
+    compare("!(d =~ /a/i)", |x| !cre("a", true).is_match(x));
+    compare("!(d =~ /e/i)", |x| !cre("e", true).is_match(x));
 
     compare(" d =~ /a/ ", |x| re("a").is_match(x));
     compare(" ! ( d =~ /a/ ) ", |x| !re("a").is_match(x));
@@ -339,6 +349,8 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 fn comprehensive_data() {
     compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
     compare2("s =~ !/[es]/", |&&Item(_, s, _)| !re("[es]").is_match(s));
+    compare2("s =~ /[eS]/i", |&&Item(_, s, _)| cre("[eS]", true).is_match(s));
+    compare2("s =~ !/[Es]/i", |&&Item(_, s, _)| !cre("[Es]", true).is_match(s));
     // watch out for the infamous ü-separated values!!1
     compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
