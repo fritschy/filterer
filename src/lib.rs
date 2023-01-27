@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 mod sema;
 mod value;
@@ -11,10 +11,21 @@ mod tests;
 
 // Following is our public interface
 pub use crate::machine::{AccessorQuery, KeyAccessor};
+use crate::machine::CompileError;
 pub use crate::parser::ParseError;
 
 pub struct ExprEval {
+    text: String,
     vm: machine::Machine,
+}
+
+impl Debug for ExprEval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExprEval")
+            .field("text", &self.text)
+            .field("idents", &self.vm.ident_names.iter().map(|(k, v)| v).collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl ExprEval {
@@ -23,10 +34,10 @@ impl ExprEval {
     }
 }
 
-pub fn compile<'a>(text: &'a str, acc: &dyn AccessorQuery) -> Result<ExprEval, ParseError<'a>> {
+pub fn compile(text: &str, acc: &dyn AccessorQuery) -> Result<ExprEval, CompileError> {
     let p = parser::parse(text)?;
-    let vm = machine::Machine::from_node_and_accessor(&p, acc);
-    Ok(ExprEval { vm })
+    let vm = machine::Machine::from_node_and_accessor(&p, acc)?;
+    Ok(ExprEval { text: text.to_string(), vm })
 }
 
 impl Display for ExprEval {

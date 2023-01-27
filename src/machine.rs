@@ -1,12 +1,38 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
 
 use regex::Regex;
+use crate::ParseError;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
+
+#[derive(Debug, PartialEq)]
+pub enum CompileError {
+    UnknownIdentifier(String),
+    ParseError(ParseError),
+}
+
+impl<'a> From<ParseError> for CompileError {
+    fn from(value: ParseError) -> Self {
+        Self::ParseError(value)
+    }
+}
+
+impl Display for CompileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CompileError::UnknownIdentifier(i) => write!(f, "Unknown Identifier '{i}'"),
+            CompileError::ParseError(pe) => write!(f, "{pe}"),
+        }
+    }
+}
+
+impl Error for CompileError {}
 
 pub trait KeyAccessor {
     fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>>;
@@ -115,8 +141,7 @@ impl Instr {
 
 pub(crate) struct Machine {
     instr: Vec<Instr>,
-    mem: RefCell<Vec<Value>>,
-    ident_names: BTreeMap<usize, String>,
+    pub(crate) ident_names: BTreeMap<usize, String>,
 }
 
 // Solely used for formatting instructions
@@ -131,18 +156,18 @@ impl fmt::Display for Machine {
 }
 
 impl Machine {
-    pub(crate) fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Machine {
+    pub(crate) fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Result<Machine, CompileError> {
         fn compile_(
             buf: &mut Vec<Instr>,
             ident_names: &mut BTreeMap<usize, String>,
             acc: &dyn AccessorQuery,
             node: &Node,
-        ) {
+        ) -> Result<(), CompileError> {
             match node {
                 Node::Binary { rhs, op, lhs } => {
                     // This needs to be reversed for eval.
-                    compile_(buf, ident_names, acc, lhs.as_ref());
-                    compile_(buf, ident_names, acc, rhs.as_ref());
+                    compile_(buf, ident_names, acc, lhs.as_ref())?;
+                    compile_(buf, ident_names, acc, rhs.as_ref())?;
                     if matches!(op, BinaryOp::Ne) {
                         buf.push(BinaryOp::Eq.into());
                         buf.push(UnaryOp::Not.into());
@@ -152,7 +177,7 @@ impl Machine {
                 }
 
                 Node::Unary { op, expr } => {
-                    compile_(buf, ident_names, acc, expr.as_ref());
+                    compile_(buf, ident_names, acc, expr.as_ref())?;
                     buf.push((*op).into());
                 }
 
@@ -161,8 +186,7 @@ impl Machine {
                         ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadIdent(ik))
                     } else {
-                        eprintln!("Could not lookup ident '{}', emitting 'load nil'", x);
-                        buf.push(Instr::LoadNil)
+                        return Err(CompileError::UnknownIdentifier(x.to_string()));
                     }
                 }
 
@@ -171,8 +195,7 @@ impl Machine {
                         ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadIndexIdent(ik, *i))
                     } else {
-                        eprintln!("Could not lookup index ident '{}', emitting 'load nil'", x);
-                        buf.push(Instr::LoadNil)
+                        return Err(CompileError::UnknownIdentifier(x.to_string()));
                     }
                 }
 
@@ -181,30 +204,27 @@ impl Machine {
                         ident_names.entry(ik).or_insert_with(|| x.to_string());
                         buf.push(Instr::LoadArrayIdentLen(ik))
                     } else {
-                        eprintln!(
-                            "Could not lookup array len ident '{}', emitting 'load nil'",
-                            x
-                        );
-                        buf.push(Instr::LoadNil)
+                        return Err(CompileError::UnknownIdentifier(x.to_string()));
                     }
                 }
 
                 _ => buf.push(Instr::from_terminal_node(node)),
             }
+
+            Ok(())
         }
 
         let mut buf = Vec::with_capacity(32);
         let mut ident_names = BTreeMap::new();
 
-        compile_(&mut buf, &mut ident_names, acc, node);
+        compile_(&mut buf, &mut ident_names, acc, node)?;
 
         let max_depth = Self::max_depth(&buf);
 
-        Machine {
+        Ok(Machine {
             instr: buf,
-            mem: RefCell::new(vec![Value::Nil; max_depth]),
             ident_names,
-        }
+        })
     }
 
     fn max_depth(buf: &[Instr]) -> usize {
@@ -243,7 +263,7 @@ impl Machine {
 
     pub(crate) fn eval<T: KeyAccessor>(&self, a: &T) -> bool {
         fn eval_<T: KeyAccessor>(mach: &Machine, a: &T) -> bool {
-            let mut mem = mach.mem.borrow_mut();
+            let mut mem = vec![Value::Nil; 32];
             let stack_size = mem.len();
             let mut cur = 0;
             let ptr = mem.as_mut_ptr();

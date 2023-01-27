@@ -150,16 +150,16 @@ impl Node {
     }
 }
 
-#[derive(Debug)]
-pub struct ParseError<'a> {
-    input: Input<'a>,
+#[derive(Debug, PartialEq)]
+pub struct ParseError {
+    input: String,
     pos: usize,
     msg: String,
 }
 
-impl<'a> ParseError<'a> {
-    fn new(input: Input<'a>, pos: usize, msg: String) -> Self {
-        Self { input, pos, msg }
+impl ParseError {
+    fn new(input: Input, pos: usize, msg: String) -> Self {
+        Self { input: input.to_string(), pos, msg }
     }
 
     pub fn describe(&self) -> String {
@@ -167,7 +167,7 @@ impl<'a> ParseError<'a> {
     }
 }
 
-impl<'a> fmt::Display for ParseError<'a> {
+impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Parse Error: {}", self.msg)?;
         writeln!(f, "> {}", self.input)?;

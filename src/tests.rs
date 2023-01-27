@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use regex::{Regex, RegexBuilder};
 
-use crate::compile;
-use crate::machine::{AccessorQuery, KeyAccessor};
+use crate::{compile, ExprEval};
+use crate::machine::{AccessorQuery, CompileError, KeyAccessor};
 use crate::parser::parse;
 use crate::value::{parse_num, Value};
 
@@ -64,6 +64,11 @@ fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     }) {
         panic!("{}", p);
     }
+}
+
+// Compare expr filter with iter filter
+fn compile_result(expr: &str) -> Result<ExprEval, CompileError> {
+    compile(expr, &DataQuery)
 }
 
 fn re(s: &str) -> Regex {
@@ -134,8 +139,8 @@ fn always_false() {
     check("0 && 1", false);
     check("0.1", false);
 
-    compare("does_not_exist", |_| false);
-    compare("doesNotExist == doesNotExist", |_| false);
+    assert_eq!(compile_result("does_not_exist").unwrap_err(), CompileError::UnknownIdentifier(String::from("does_not_exist")));
+    assert_eq!(compile_result("doesNotExist == doesNotExist").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));
 }
 
 #[test]
@@ -278,7 +283,7 @@ fn mixing_types() {
     compare("\"0x100\" <= d", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
 
     // Nil cannot be matched against an Re
-    compare("doesNotExist =~ //", |_| false);
+    assert_eq!(compile_result("doesNotExist =~ /./").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -443,17 +448,11 @@ fn arrays() {
     compare("a[0o3]", |x| x.a.len() > 3 && x.a[3] > 0);
     compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
     compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
-    compare("b[0x10000]", |_| false);
     compare("a[0x10000]", |_| false);
     compare("a[0x10000] == a[0x10000]", |_| false);
     compare("a.len > 1", |x| x.a.len() > 1);
     compare("a.len == 0", |x| x.a.is_empty());
     compare("i.len", |_| false);
-    compare("x.len", |_| false);
-    compare("z.len == 0", |_| false);
-    compare("z.len >= 0", |_| false);
-    compare("z.len < 0", |_| false);
-    compare("z.len == z.len", |_| false);
     compare("s[0] =~ /a/", |x| x.s.len() >= 1 && x.s[0].contains("a"));
     compare("s[0] =~ /NOT FOUND/", |_| false);
     compare("s[0] =~ /moo/", |x| x.s.len() >= 1 && x.s[0].contains("moo"));
