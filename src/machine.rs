@@ -1,8 +1,8 @@
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use regex::Regex;
@@ -265,7 +265,14 @@ impl Machine {
 
     pub(crate) fn eval<T: KeyAccessor>(&self, a: &T) -> bool {
         fn eval_<T: KeyAccessor>(mach: &Machine, a: &T) -> bool {
-            let mut mem = vec![Value::Nil; mach.max_depth];
+            let mut mem = MaybeUninit::<[Value; 64]>::uninit();
+            // SAFETY: We du assert that our stack will not outgrow this array,
+            // additionally, before anything is rad from the memory it must first
+            // be written there.
+            let mem = unsafe { mem.assume_init_mut() };
+
+            assert!(mach.max_depth < mem.len());
+
             let stack_size = mem.len();
             let mut cur = 0;
             let ptr = mem.as_mut_ptr();
