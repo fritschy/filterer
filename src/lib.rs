@@ -23,7 +23,7 @@ impl Debug for ExprEval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ExprEval")
             .field("text", &self.text)
-            .field("idents", &self.vm.ident_names.iter().map(|(k, v)| v).collect::<Vec<_>>())
+            .field("idents", &self.vm.ident_names.iter().map(|(_, v)| v).collect::<Vec<_>>())
             .finish()
     }
 }
