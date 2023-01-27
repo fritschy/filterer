@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use regex::Regex;
 
@@ -12,8 +12,8 @@ pub fn parse_num(i: &str) -> isize {
 #[derive(Clone)]
 pub(crate) enum Value {
     Int(isize),
-    Str(Rc<String>),
-    Re(Rc<Regex>),
+    Str(Arc<String>),
+    Re(Arc<Regex>),
     Nil,
 }
 

@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::io;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Instant;
 
 use rustyline::Editor;
@@ -12,8 +12,8 @@ use filterer::{AccessorQuery, compile, KeyAccessor};
 struct Message {
     ts: usize,
     flags: usize,
-    ctx: Rc<String>,
-    app: Rc<String>,
+    ctx: Arc<String>,
+    app: Arc<String>,
     level: usize,
     args: Vec<usize>,
 }
@@ -38,7 +38,7 @@ mod keys {
 }
 
 impl KeyAccessor for Message {
-    fn get_str(&self, k: usize, _i: usize) -> Option<Rc<String>> {
+    fn get_str(&self, k: usize, _i: usize) -> Option<Arc<String>> {
         match k {
             keys::CTX => Some(self.ctx.clone()),
             keys::APP => Some(self.app.clone()),
@@ -85,45 +85,45 @@ impl AccessorQuery for MessageQuery {
     }
 }
 
-fn messages() -> Vec<Rc<Message>> {
+fn messages() -> Vec<Arc<Message>> {
     vec![
-        Rc::new(Message {
+        Arc::new(Message {
             ts: 0,
             flags: 0x300,
-            ctx: Rc::new(String::from("render")),
-            app: Rc::new(String::from("HMI2")),
+            ctx: Arc::new(String::from("render")),
+            app: Arc::new(String::from("HMI2")),
             level: 0,
             args: vec![47, 11],
         }),
-        Rc::new(Message {
+        Arc::new(Message {
             ts: 100,
             flags: 0x301,
-            ctx: Rc::new(String::from("render")),
-            app: Rc::new(String::from("HMI1")),
+            ctx: Arc::new(String::from("render")),
+            app: Arc::new(String::from("HMI1")),
             level: 0,
             args: vec![42, 16, 29, 34],
         }),
-        Rc::new(Message {
+        Arc::new(Message {
             ts: 101,
             flags: 0x201,
-            ctx: Rc::new(String::from("menu")),
-            app: Rc::new(String::from("HMI")),
+            ctx: Arc::new(String::from("menu")),
+            app: Arc::new(String::from("HMI")),
             level: 3,
             args: vec![0, 1, 2],
         }),
-        Rc::new(Message {
+        Arc::new(Message {
             ts: 200,
             flags: 0x300,
-            ctx: Rc::new(String::from("map")),
-            app: Rc::new(String::from("MAP")),
+            ctx: Arc::new(String::from("map")),
+            app: Arc::new(String::from("MAP")),
             level: 1,
             args: Vec::new(),
         }),
-        Rc::new(Message {
+        Arc::new(Message {
             ts: 300,
             flags: 0x004,
-            ctx: Rc::new(String::from("intersection")),
-            app: Rc::new(String::from("SideMAP")),
+            ctx: Arc::new(String::from("intersection")),
+            app: Arc::new(String::from("SideMAP")),
             level: 1,
             args: vec![0, 8, 15],
         }),

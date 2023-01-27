@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use regex::Regex;
 use crate::ParseError;
@@ -35,7 +35,7 @@ impl Display for CompileError {
 impl Error for CompileError {}
 
 pub trait KeyAccessor {
-    fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>>;
+    fn get_str(&self, k: usize, i: usize) -> Option<Arc<String>>;
     fn get_num(&self, k: usize, i: usize) -> Option<isize>;
     fn get_len(&self, k: usize) -> Option<isize>;
 }
@@ -49,9 +49,9 @@ enum Instr {
     LoadIndexIdent(usize, usize),
     LoadArrayIdentLen(usize),
 
-    LoadString(Rc<String>),
+    LoadString(Arc<String>),
     LoadNum(isize),
-    LoadRe(Rc<Regex>),
+    LoadRe(Arc<Regex>),
     LoadNil,
     And,
     Or,
@@ -140,6 +140,7 @@ impl Instr {
 }
 
 pub(crate) struct Machine {
+    max_depth: usize,
     instr: Vec<Instr>,
     pub(crate) ident_names: BTreeMap<usize, String>,
 }
@@ -222,6 +223,7 @@ impl Machine {
         let max_depth = Self::max_depth(&buf);
 
         Ok(Machine {
+            max_depth,
             instr: buf,
             ident_names,
         })
@@ -263,7 +265,7 @@ impl Machine {
 
     pub(crate) fn eval<T: KeyAccessor>(&self, a: &T) -> bool {
         fn eval_<T: KeyAccessor>(mach: &Machine, a: &T) -> bool {
-            let mut mem = vec![Value::Nil; 32];
+            let mut mem = vec![Value::Nil; mach.max_depth];
             let stack_size = mem.len();
             let mut cur = 0;
             let ptr = mem.as_mut_ptr();

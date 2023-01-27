@@ -1,6 +1,6 @@
 use std::fmt;
 use std::num::ParseIntError;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use nom::{AsChar, Finish, IResult, Offset};
 use nom::branch::alt;
@@ -18,19 +18,19 @@ use crate::sema;
 pub(crate) enum Node {
     Unary {
         op: UnaryOp,
-        expr: Rc<Node>,
+        expr: Arc<Node>,
     },
     Binary {
-        lhs: Rc<Node>,
+        lhs: Arc<Node>,
         op: BinaryOp,
-        rhs: Rc<Node>,
+        rhs: Arc<Node>,
     },
-    Identifier(Rc<String>),
-    IndexedIdentifier(Rc<String>, usize),
-    ArrayIdentifierLen(Rc<String>),
+    Identifier(Arc<String>),
+    IndexedIdentifier(Arc<String>, usize),
+    ArrayIdentifierLen(Arc<String>),
     Constant(isize),
-    StringLiteral(Rc<String>),
-    Regexp(Rc<regex::Regex>),
+    StringLiteral(Arc<String>),
+    Regexp(Arc<regex::Regex>),
     Nil,
 }
 
@@ -99,54 +99,54 @@ pub(crate) fn parse_num(i: &str) -> Result<isize, ParseIntError> {
 }
 
 impl Node {
-    fn from_identifier(i: Input) -> Rc<Node> {
-        Rc::new(Node::Identifier(Rc::new(i.to_string())))
+    fn from_identifier(i: Input) -> Arc<Node> {
+        Arc::new(Node::Identifier(Arc::new(i.to_string())))
     }
 
-    fn from_indexed_identifier(ident: Input, index: usize) -> Rc<Node> {
-        Rc::new(Node::IndexedIdentifier(Rc::new(ident.to_string()), index))
+    fn from_indexed_identifier(ident: Input, index: usize) -> Arc<Node> {
+        Arc::new(Node::IndexedIdentifier(Arc::new(ident.to_string()), index))
     }
 
-    fn from_array_identifier_len(ident: Input) -> Rc<Node> {
-        Rc::new(Node::ArrayIdentifierLen(Rc::new(ident.to_string())))
+    fn from_array_identifier_len(ident: Input) -> Arc<Node> {
+        Arc::new(Node::ArrayIdentifierLen(Arc::new(ident.to_string())))
     }
 
-    fn from_numeric(i: Input) -> Rc<Node> {
+    fn from_numeric(i: Input) -> Arc<Node> {
         if let Ok(num) = parse_num(i) {
-            Rc::new(Node::Constant(num))
+            Arc::new(Node::Constant(num))
         } else {
-            Rc::new(Node::Constant(0))
+            Arc::new(Node::Constant(0))
         }
     }
 
-    fn from_string(i: Input) -> Rc<Node> {
-        Rc::new(Node::StringLiteral(Rc::new(i.to_string())))
+    fn from_string(i: Input) -> Arc<Node> {
+        Arc::new(Node::StringLiteral(Arc::new(i.to_string())))
     }
 
     #[cfg(feature = "fuzz")]
-    fn from_regexp(_: Input, _: bool) -> Rc<Node> {
+    fn from_regexp(_: Input, _: bool) -> Arc<Node> {
         if let Ok(re) = regex::Regex::new("") {
-            Rc::new(Node::Regexp(Rc::new(re)))
+            Arc::new(Node::Regexp(Arc::new(re)))
         } else {
-            Rc::new(Node::Nil)
+            Arc::new(Node::Nil)
         }
     }
 
     #[cfg(not(feature = "fuzz"))]
-    fn from_regexp(i: Input, icase: bool) -> Rc<Node> {
+    fn from_regexp(i: Input, icase: bool) -> Arc<Node> {
         if let Ok(re) = regex::RegexBuilder::new(i).case_insensitive(icase).build() {
-            Rc::new(Node::Regexp(Rc::new(re)))
+            Arc::new(Node::Regexp(Arc::new(re)))
         } else {
-            Rc::new(Node::Nil)
+            Arc::new(Node::Nil)
         }
     }
 
-    fn new_binary(lhs: Rc<Node>, op: BinaryOp, rhs: Rc<Node>) -> Rc<Node> {
-        Rc::new(Node::Binary { lhs, op, rhs })
+    fn new_binary(lhs: Arc<Node>, op: BinaryOp, rhs: Arc<Node>) -> Arc<Node> {
+        Arc::new(Node::Binary { lhs, op, rhs })
     }
 
-    fn new_unary(op: UnaryOp, expr: Rc<Node>) -> Rc<Node> {
-        Rc::new(Node::Unary { op, expr })
+    fn new_unary(op: UnaryOp, expr: Arc<Node>) -> Arc<Node> {
+        Arc::new(Node::Unary { op, expr })
     }
 }
 
@@ -180,7 +180,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub(crate) fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
+pub(crate) fn parse(i: Input) -> Result<Arc<Node>, ParseError> {
     match parse_expr(i) {
         Ok((_, o)) => {
             // FIXME: are transformations supposed to be run before analysis/checks?
@@ -203,7 +203,7 @@ pub(crate) fn parse(i: Input) -> Result<Rc<Node>, ParseError> {
 }
 
 // parse_expr = { SOI ~ simple_expr ~ ws* ~ EOI }
-fn parse_expr(i: Input) -> IResult<Input, Rc<Node>> {
+fn parse_expr(i: Input) -> IResult<Input, Arc<Node>> {
     let (i, e) = simple_expr(0)(i)?;
     let (i, _) = multispace0(i)?;
     let (i, _) = eof(i)?;
@@ -213,9 +213,9 @@ fn parse_expr(i: Input) -> IResult<Input, Rc<Node>> {
 // generic_expr = { ws* ~ nextp ~ (ws* ~ opp ~ generic_expr ~ ws*)? }
 fn generic_expr<'a>(
     opp: &mut impl FnMut(Input) -> IResult<Input, BinaryOp>,
-    nextp: &impl Fn(Input) -> IResult<Input, Rc<Node>>,
+    nextp: &impl Fn(Input) -> IResult<Input, Arc<Node>>,
     i: &'a str,
-) -> IResult<&'a str, Rc<Node>> {
+) -> IResult<&'a str, Arc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, ae) = nextp(i)?;
     let (i, on) = opt(move |i| {
@@ -234,7 +234,7 @@ fn generic_expr<'a>(
     }
 }
 
-fn simple_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn simple_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
@@ -245,7 +245,7 @@ fn simple_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
     }
 }
 
-fn and_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn and_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
@@ -256,7 +256,7 @@ fn and_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
     }
 }
 
-fn rel_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn rel_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
@@ -267,7 +267,7 @@ fn rel_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
     }
 }
 
-fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
@@ -279,7 +279,7 @@ fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
 }
 
 // unary_expr = { ws* ~ ("!" | "-")? ~ factor }
-fn unary_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn unary_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         let (i, _) = multispace0(i)?;
@@ -295,7 +295,7 @@ fn unary_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
 }
 
 // factor = { ws* ~ (identifier | numeric | string | parens_expr) }
-fn factor(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn factor(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         let (i, _) = multispace0(i)?;
@@ -360,7 +360,7 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
 }
 
 // parens_expr = { ws* ~ "(" ~ simple_expr ~ ")" }
-fn parens_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Rc<Node>> {
+fn parens_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         let (i, _) = multispace0(i)?;
@@ -384,7 +384,7 @@ fn relop(i: Input) -> IResult<Input, BinaryOp> {
     )(i)
 }
 
-fn identifier(i: Input) -> IResult<Input, Rc<Node>> {
+fn identifier(i: Input) -> IResult<Input, Arc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
@@ -406,7 +406,7 @@ fn dot_len(i: Input) -> IResult<Input, ()> {
     Ok((i, ()))
 }
 
-fn numeric(i: Input) -> IResult<Input, Rc<Node>> {
+fn numeric(i: Input) -> IResult<Input, Arc<Node>> {
     let (i, _) = multispace0(i)?;
     let (i, n) = map(
         alt((hexnum, octnum, binnum, recognize_float)),

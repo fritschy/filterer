@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use regex::{Regex, RegexBuilder};
 
@@ -25,8 +25,8 @@ const DATA: &[Data] = &[
 ];
 
 impl KeyAccessor for Data {
-    fn get_str(&self, _: usize, _i: usize) -> Option<Rc<String>> {
-        Some(Rc::new(String::from(*self)))
+    fn get_str(&self, _: usize, _i: usize) -> Option<Arc<String>> {
+        Some(Arc::new(String::from(*self)))
     }
 
     fn get_num(&self, _: usize, _: usize) -> Option<isize> {
@@ -82,8 +82,8 @@ fn cre(s: &str, icase: bool) -> Regex {
 fn check(expr: &str, exp: bool) {
     struct X;
     impl KeyAccessor for X {
-        fn get_str(&self, _: usize, _: usize) -> Option<Rc<String>> {
-            Some(Rc::new(String::from("1")))
+        fn get_str(&self, _: usize, _: usize) -> Option<Arc<String>> {
+            Some(Arc::new(String::from("1")))
         }
         fn get_num(&self, _: usize, _: usize) -> Option<isize> {
             Some(1)
@@ -148,9 +148,9 @@ fn one_array_only() {
     fn check(expr: &str, f: impl Fn(&&Data) -> bool) {
         struct X;
         impl KeyAccessor for X {
-            fn get_str(&self, n: usize, i: usize) -> Option<Rc<String>> {
+            fn get_str(&self, n: usize, i: usize) -> Option<Arc<String>> {
                 if n == 0 && i < DATA.len() {
-                    return Some(Rc::new(DATA[i].to_string()));
+                    return Some(Arc::new(DATA[i].to_string()));
                 }
                 None
             }
@@ -279,8 +279,8 @@ fn mixing_types() {
     compare("0x100 == d", |&&x| x == "0x100");
 
     // Need to invoke PartialOrd for Value
-    compare("d >= \"0x100\"", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
-    compare("\"0x100\" <= d", |&&x| Value::Str(Rc::new(String::from(x))) >= Value::Str(Rc::new(String::from("0x100"))));
+    compare("d >= \"0x100\"", |&&x| Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100"))));
+    compare("\"0x100\" <= d", |&&x| Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100"))));
 
     // Nil cannot be matched against an Re
     assert_eq!(compile_result("doesNotExist =~ /./").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));
@@ -290,9 +290,9 @@ fn mixing_types() {
 struct Item(isize, &'static str, isize);
 
 impl KeyAccessor for Item {
-    fn get_str(&self, k: usize, _i: usize) -> Option<Rc<String>> {
+    fn get_str(&self, k: usize, _i: usize) -> Option<Arc<String>> {
         match k {
-            1 => Some(Rc::new(String::from(self.1))),
+            1 => Some(Arc::new(String::from(self.1))),
             _ => None,
         }
     }
@@ -375,9 +375,9 @@ fn arrays() {
     }
 
     impl KeyAccessor for D {
-        fn get_str(&self, k: usize, i: usize) -> Option<Rc<String>> {
+        fn get_str(&self, k: usize, i: usize) -> Option<Arc<String>> {
             if k == 2 && i < self.s.len() {
-                Some(Rc::new(self.s[i].clone()))
+                Some(Arc::new(self.s[i].clone()))
             } else {
                 None
             }
