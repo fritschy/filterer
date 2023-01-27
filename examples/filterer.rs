@@ -139,7 +139,7 @@ fn doit(l: &str, bench: bool) {
 
         let mut count = 0;
         let mut allcount = 0;
-        let max = if bench { 1_000_000 } else { 1 };
+        let max = if bench { 100_000 } else { 1 };
         let msgs = messages();
         for _i in 0..max {
             for m in msgs.iter() {
