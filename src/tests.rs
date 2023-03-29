@@ -102,7 +102,6 @@ fn check(expr: &str, exp: bool) {
     }
     const DATA0: X = X;
     let machine = compile(expr, &X).unwrap();
-    println!("Code:\n{}", &machine);
     assert_eq!(machine.eval(&DATA0), exp);
 }
 
@@ -138,6 +137,8 @@ fn always_false() {
     check("1 && 0", false);
     check("0 && 1", false);
     check("0.1", false);
+    check(&("0||".repeat(64) + "0"), false);
+    check(&("0||".repeat(750) + "0"), false);
 
     assert_eq!(compile_result("does_not_exist").unwrap_err(), CompileError::UnknownIdentifier(String::from("does_not_exist")));
     assert_eq!(compile_result("doesNotExist == doesNotExist").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));

@@ -313,7 +313,7 @@ fn factor(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     }
 }
 
-fn string<'a>(delimiter: Input<'a>) -> impl FnMut(Input<'a>) -> IResult<Input, Input> {
+pub(crate) fn string<'a>(delimiter: Input<'a>) -> impl FnMut(Input<'a>) -> IResult<Input, Input> {
     delimited(
         tag(delimiter),
         recognize(move |i| {
@@ -356,6 +356,20 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
                 }
             }),
         )(i)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escaped_char_test() {
+        let input = "\\/";
+        assert!(escaped_char("/")(input) == Ok(("", "/")));
+
+        let input = "\\/a";
+        assert!(escaped_char("/")(input) == Ok(("a", "/")));
     }
 }
 

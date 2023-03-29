@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use regex::Regex;
+use smallvec::{SmallVec, smallvec};
 use crate::ParseError;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
@@ -15,6 +15,7 @@ use crate::value::Value;
 pub enum CompileError {
     UnknownIdentifier(String),
     ParseError(ParseError),
+    MaxDepthExceeded(usize),
 }
 
 impl<'a> From<ParseError> for CompileError {
@@ -28,6 +29,7 @@ impl Display for CompileError {
         match self {
             CompileError::UnknownIdentifier(i) => write!(f, "Unknown Identifier '{i}'"),
             CompileError::ParseError(pe) => write!(f, "{pe}"),
+            CompileError::MaxDepthExceeded(m) => write!(f, "Maximum stack memory size exceeded ({m})"),
         }
     }
 }
@@ -222,6 +224,10 @@ impl Machine {
 
         let max_depth = Self::max_depth(&buf);
 
+        if max_depth > 751 {
+            return Err(CompileError::MaxDepthExceeded(max_depth));
+        }
+
         Ok(Machine {
             max_depth,
             instr: buf,
@@ -265,11 +271,11 @@ impl Machine {
 
     pub(crate) fn eval<T: KeyAccessor>(&self, a: &T) -> bool {
         fn eval_<T: KeyAccessor>(mach: &Machine, a: &T) -> bool {
-            let mut mem = MaybeUninit::<[Value; 64]>::uninit();
+            let mut mem: SmallVec<[Value; 64]> = smallvec![Value::Nil; mach.max_depth + 1];
             // SAFETY: We du assert that our stack will not outgrow this array,
             // additionally, before anything is rad from the memory it must first
             // be written there.
-            let mem = unsafe { mem.assume_init_mut() };
+            let mem = mem.as_mut_slice();
 
             assert!(mach.max_depth < mem.len());
 
