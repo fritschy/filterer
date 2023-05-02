@@ -90,6 +90,14 @@ fn messages() -> Vec<Arc<Message>> {
         Arc::new(Message {
             ts: 0,
             flags: 0x300,
+            ctx: Arc::new(String::from("render/lines")),
+            app: Arc::new(String::from("HMI")),
+            level: 0,
+            args: vec![47, 11],
+        }),
+        Arc::new(Message {
+            ts: 0,
+            flags: 0x300,
             ctx: Arc::new(String::from("render")),
             app: Arc::new(String::from("HMI2")),
             level: 0,
