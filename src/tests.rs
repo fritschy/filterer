@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use regex::{Regex, RegexBuilder};
 
-use crate::{compile, ExprEval};
 use crate::machine::{AccessorQuery, CompileError, KeyAccessor};
 use crate::parser::parse;
 use crate::value::{parse_num, Value};
+use crate::{compile, ExprEval};
 
 type Data = &'static str;
 
@@ -22,6 +22,7 @@ const DATA: &[Data] = &[
     "0o12",
     "0b101",
     "\"\\\"moo\\\"\n\t\\v\r\\f",
+    "/this/is/a/path",
 ];
 
 impl KeyAccessor for Data {
@@ -76,7 +77,10 @@ fn re(s: &str) -> Regex {
 }
 
 fn cre(s: &str, icase: bool) -> Regex {
-    RegexBuilder::new(s).case_insensitive(icase).build().expect("regex")
+    RegexBuilder::new(s)
+        .case_insensitive(icase)
+        .build()
+        .expect("regex")
 }
 
 fn check(expr: &str, exp: bool) {
@@ -140,8 +144,14 @@ fn always_false() {
     check(&("0||".repeat(64) + "0"), false);
     check(&("0||".repeat(750) + "0"), false);
 
-    assert_eq!(compile_result("does_not_exist").unwrap_err(), CompileError::UnknownIdentifier(String::from("does_not_exist")));
-    assert_eq!(compile_result("doesNotExist == doesNotExist").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));
+    assert_eq!(
+        compile_result("does_not_exist").unwrap_err(),
+        CompileError::UnknownIdentifier(String::from("does_not_exist"))
+    );
+    assert_eq!(
+        compile_result("doesNotExist == doesNotExist").unwrap_err(),
+        CompileError::UnknownIdentifier(String::from("doesNotExist"))
+    );
 }
 
 #[test]
@@ -195,7 +205,19 @@ fn regexes() {
     compare("!(d =~ /e/i)", |x| !cre("e", true).is_match(x));
 
     compare(" d =~ /a/ ", |x| re("a").is_match(x));
+
+    // negated match
+    compare(" d =~ !/a/ ", |x| !re("a").is_match(x));
     compare(" ! ( d =~ /a/ ) ", |x| !re("a").is_match(x));
+    compare(" ! ( d =~ !/a/ ) ", |x| re("a").is_match(x));
+
+    // We don't currently handle "!!..."
+    compare(" ! (!( d =~ !/a/ )) ", |x| !re("a").is_match(x));
+
+    // match with a /, obviously needed for paths and URLs ...
+    compare(" ! ( d =~ /\\// ) ", |x| !re("/").is_match(x));
+    compare(" d =~ !/\\// ", |x| !re("/").is_match(x));
+    compare(" d =~ /\\// ", |x| re("/").is_match(x));
 
     // Invalid regex will be replaced by a not-matching regex
     compare("d =~ /(/", |_| false);
@@ -232,7 +254,10 @@ fn parse_errors() {
     println!("{}", parse("\"").unwrap_err().describe());
     println!("{}", parse("flags && flags &").unwrap_err().describe());
     println!("{}", parse("\0").unwrap_err().describe());
-    println!("{}", parse("(".repeat(500).as_str()).unwrap_err().describe());
+    println!(
+        "{}",
+        parse("(".repeat(500).as_str()).unwrap_err().describe()
+    );
     println!(
         "{}",
         parse("flags & 0x700 <= 0x300 || (ts >= 1000 && ts < 100000f)")
@@ -280,11 +305,18 @@ fn mixing_types() {
     compare("0x100 == d", |&&x| x == "0x100");
 
     // Need to invoke PartialOrd for Value
-    compare("d >= \"0x100\"", |&&x| Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100"))));
-    compare("\"0x100\" <= d", |&&x| Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100"))));
+    compare("d >= \"0x100\"", |&&x| {
+        Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100")))
+    });
+    compare("\"0x100\" <= d", |&&x| {
+        Value::Str(Arc::new(String::from(x))) >= Value::Str(Arc::new(String::from("0x100")))
+    });
 
     // Nil cannot be matched against an Re
-    assert_eq!(compile_result("doesNotExist =~ /./").unwrap_err(), CompileError::UnknownIdentifier(String::from("doesNotExist")));
+    assert_eq!(
+        compile_result("doesNotExist =~ /./").unwrap_err(),
+        CompileError::UnknownIdentifier(String::from("doesNotExist"))
+    );
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -306,11 +338,14 @@ impl KeyAccessor for Item {
         }
     }
 
-    fn get_len(&self, _: usize) -> Option<isize> { None }
+    fn get_len(&self, _: usize) -> Option<isize> {
+        None
+    }
 }
 
 const DATA2: &[Item] = &[
     Item(0, "null", 0x100),
+    Item(0, "null2", 0x000),
     Item(1, "eins", 0x002),
     Item(2, "zwo", 0x002),
     Item(3, "drei", 0x002),
@@ -355,13 +390,24 @@ fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
 fn comprehensive_data() {
     compare2("s =~ /[es]/", |&&Item(_, s, _)| re("[es]").is_match(s));
     compare2("s =~ !/[es]/", |&&Item(_, s, _)| !re("[es]").is_match(s));
-    compare2("s =~ /[eS]/i", |&&Item(_, s, _)| cre("[eS]", true).is_match(s));
-    compare2("s =~ !/[Es]/i", |&&Item(_, s, _)| !cre("[Es]", true).is_match(s));
+    compare2("s =~ /[eS]/i", |&&Item(_, s, _)| {
+        cre("[eS]", true).is_match(s)
+    });
+    compare2("s =~ !/[Es]/i", |&&Item(_, s, _)| {
+        !cre("[Es]", true).is_match(s)
+    });
     // watch out for the infamous ü-separated values!!1
     compare2("s =~ /ü/", |&&Item(_, s, _)| re("ü").is_match(s));
     compare2("u & 0x100 && i < 7", |&&Item(i, _, u)| {
         u & 0x100 != 0 && i < 7
     });
+    compare2("u & 0x100 && i < +7", |&&Item(i, _, u)| {
+        u & 0x100 != 0 && i < 7
+    });
+    compare2("u & ~0x100 && i > -7", |&&Item(i, _, u)| {
+        u & !0x100 != 0 && i > -7
+    });
+    compare2("u | 1 && i > -7", |&&Item(i, _, u)| u | 1 != 0 && i > -7);
     compare2("s =~ /\\n/", |&&Item(_, s, _)| re("\n").is_match(s));
     compare2("s =~ /\\t/", |&&Item(_, s, _)| re("\t").is_match(s));
 }
@@ -422,21 +468,44 @@ fn arrays() {
 
     fn compare(expr: &str, f: impl Fn(&&D) -> bool) {
         let data = vec![
-            D{i: 12, a: vec![9, 8, 7], s: vec![]},
-            D{i: 22, a: vec![0, 1, 2, 3, 4], s: vec!["moo a".to_string(), "test c".to_string()]},
-            D{i: 2, a: Vec::new(), s: vec!["moo".to_string(), " test ".to_string()]},
-            D{i: 3, a: vec![4711, 42], s: vec![" moo test a ".to_string()]},
-            D{i: 5, a: vec![42], s: vec!["a".to_string(), "b".to_string(), "a b".to_string(), "c".to_string(), "a c".to_string()]},
+            D {
+                i: 12,
+                a: vec![9, 8, 7],
+                s: vec![],
+            },
+            D {
+                i: 22,
+                a: vec![0, 1, 2, 3, 4],
+                s: vec!["moo a".to_string(), "test c".to_string()],
+            },
+            D {
+                i: 2,
+                a: Vec::new(),
+                s: vec!["moo".to_string(), " test ".to_string()],
+            },
+            D {
+                i: 3,
+                a: vec![4711, 42],
+                s: vec![" moo test a ".to_string()],
+            },
+            D {
+                i: 5,
+                a: vec![42],
+                s: vec![
+                    "a".to_string(),
+                    "b".to_string(),
+                    "a b".to_string(),
+                    "c".to_string(),
+                    "a c".to_string(),
+                ],
+            },
         ];
 
         if let Err(p) = compile(expr, &DataD).map(|machine| {
             let expect = data.iter().filter(f).map(|m| m).collect::<Vec<_>>();
 
             println!("Code:\n{}", &machine);
-            let d = data
-                .iter()
-                .filter(|x| machine.eval(*x))
-                .collect::<Vec<_>>();
+            let d = data.iter().filter(|x| machine.eval(*x)).collect::<Vec<_>>();
             assert_eq!(d, expect);
         }) {
             panic!("{}", p);
@@ -444,6 +513,8 @@ fn arrays() {
     }
 
     compare("a[0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0] > +0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0] > -0", |x| x.a.len() > 0 && x.a[0] > 0);
     compare("a[0x0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
     compare("a[0b0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
     compare("a[0o3]", |x| x.a.len() > 3 && x.a[3] > 0);
@@ -452,14 +523,25 @@ fn arrays() {
     compare("a[0x10000]", |_| false);
     compare("a[0x10000] == a[0x10000]", |_| false);
     compare("a.len > 1", |x| x.a.len() > 1);
+    compare("a.len > -1", |x| x.a.len() as isize > -1);
+    compare("a.len > +1", |x| x.a.len() > 1);
     compare("a.len == 0", |x| x.a.is_empty());
     compare("i.len", |_| false);
     compare("s[0] =~ /a/", |x| x.s.len() >= 1 && x.s[0].contains("a"));
     compare("s[0] =~ /NOT FOUND/", |_| false);
-    compare("s[0] =~ /moo/", |x| x.s.len() >= 1 && x.s[0].contains("moo"));
-    compare("s[0] =~ !/moo/", |x| x.s.is_empty() || (x.s.len() >= 1 && !x.s[0].contains("moo")));
+    compare("s[0] =~ /moo/", |x| {
+        x.s.len() >= 1 && x.s[0].contains("moo")
+    });
+    compare("s[0] =~ !/moo/", |x| {
+        x.s.is_empty() || (x.s.len() >= 1 && !x.s[0].contains("moo"))
+    });
 
-    println!("{}", parse("a[\"non-numeric-index\"] > 0").unwrap_err().describe());
+    println!(
+        "{}",
+        parse("a[\"non-numeric-index\"] > 0")
+            .unwrap_err()
+            .describe()
+    );
     println!("{}", parse("a[] > 0").unwrap_err().describe());
     println!("{}", parse("a[identifier] > 0").unwrap_err().describe());
     println!("{}", parse("a[a] > 0").unwrap_err().describe());
@@ -467,5 +549,10 @@ fn arrays() {
     println!("{}", parse("a[10].len").unwrap_err().describe());
     println!("{}", parse("a.length").unwrap_err().describe());
     println!("{}", parse("a.len()").unwrap_err().describe());
-    println!("{}", parse("a[7777777777777777777777777]").unwrap_err().describe());
+    println!(
+        "{}",
+        parse("a[7777777777777777777777777]")
+            .unwrap_err()
+            .describe()
+    );
 }

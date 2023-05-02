@@ -4,9 +4,9 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use regex::Regex;
-use smallvec::{SmallVec, smallvec};
 use crate::ParseError;
+use regex::Regex;
+use smallvec::{smallvec, SmallVec};
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
@@ -29,7 +29,9 @@ impl Display for CompileError {
         match self {
             CompileError::UnknownIdentifier(i) => write!(f, "Unknown Identifier '{i}'"),
             CompileError::ParseError(pe) => write!(f, "{pe}"),
-            CompileError::MaxDepthExceeded(m) => write!(f, "Maximum stack memory size exceeded ({m})"),
+            CompileError::MaxDepthExceeded(m) => {
+                write!(f, "Maximum stack memory size exceeded ({m})")
+            }
         }
     }
 }
@@ -62,9 +64,13 @@ enum Instr {
     Le,
     Gt,
     Ge,
-    BAnd,
+    Band,
     Match,
     Not,
+    NegBits,
+    Neg,
+    Nop,
+    Bor,
 }
 
 impl fmt::Display for NamedInstr<'_> {
@@ -97,9 +103,13 @@ impl fmt::Display for NamedInstr<'_> {
             Instr::Le => write!(f, "le"),
             Instr::Gt => write!(f, "gt"),
             Instr::Ge => write!(f, "ge"),
-            Instr::BAnd => write!(f, "band"),
+            Instr::Band => write!(f, "band"),
+            Instr::Bor => write!(f, "bor"),
             Instr::Match => write!(f, "match"),
             Instr::Not => write!(f, "not"),
+            Instr::NegBits => write!(f, "bneg"),
+            Instr::Neg => write!(f, "neg"),
+            Instr::Nop => write!(f, "nop"),
         }
     }
 }
@@ -115,7 +125,8 @@ impl From<BinaryOp> for Instr {
             BinaryOp::Le => Instr::Le,
             BinaryOp::Lt => Instr::Lt,
             BinaryOp::Match => Instr::Match,
-            BinaryOp::Band => Instr::BAnd,
+            BinaryOp::Band => Instr::Band,
+            BinaryOp::Bor => Instr::Bor,
             BinaryOp::Ne => unreachable!("ne operator needs to be mapped to !eq"),
         }
     }
@@ -125,6 +136,9 @@ impl From<UnaryOp> for Instr {
     fn from(op: UnaryOp) -> Self {
         match op {
             UnaryOp::Not => Instr::Not,
+            UnaryOp::Neg => Instr::Neg,
+            UnaryOp::Pos => Instr::Nop,
+            UnaryOp::NegBits => Instr::NegBits,
         }
     }
 }
@@ -159,7 +173,10 @@ impl fmt::Display for Machine {
 }
 
 impl Machine {
-    pub(crate) fn from_node_and_accessor(node: &Node, acc: &dyn AccessorQuery) -> Result<Machine, CompileError> {
+    pub(crate) fn from_node_and_accessor(
+        node: &Node,
+        acc: &dyn AccessorQuery,
+    ) -> Result<Machine, CompileError> {
         fn compile_(
             buf: &mut Vec<Instr>,
             ident_names: &mut BTreeMap<usize, String>,
@@ -244,7 +261,8 @@ impl Machine {
                         Instr::And
                         | Instr::Or
                         | Instr::Match
-                        | Instr::BAnd
+                        | Instr::Band
+                        | Instr::Bor
                         | Instr::Ge
                         | Instr::Le
                         | Instr::Gt
@@ -252,7 +270,7 @@ impl Machine {
                         | Instr::Eq => -1,
 
                         // Pop 1, Push 1
-                        Instr::Not => 0,
+                        Instr::Not | Instr::Neg | Instr::Nop | Instr::NegBits => 0,
 
                         // All loads push 1
                         Instr::LoadIdent(_)
@@ -386,7 +404,7 @@ impl Machine {
                         push!((l.as_bool() || r.as_bool()).into());
                     }
 
-                    Instr::BAnd => {
+                    Instr::Band => {
                         let r = pop!();
                         let l = pop!();
                         push!((l.as_int() & r.as_int()).into());
@@ -409,6 +427,22 @@ impl Machine {
                         } else {
                             push!(false.into());
                         }
+                    }
+                    Instr::NegBits => {
+                        let v = pop!();
+                        let v = !v.as_int();
+                        push!(v.into());
+                    }
+                    Instr::Neg => {
+                        let v = pop!();
+                        let v = -v.as_int();
+                        push!(v.into());
+                    }
+                    Instr::Nop => {}
+                    Instr::Bor => {
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l.as_int() | r.as_int()).into());
                     }
                 }
             }

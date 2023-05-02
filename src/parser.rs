@@ -2,15 +2,15 @@ use std::fmt;
 use std::num::ParseIntError;
 use std::sync::Arc;
 
-use nom::{AsChar, Finish, IResult, Offset};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
-use nom::character::{is_alphanumeric, is_digit, is_hex_digit, is_oct_digit};
 use nom::character::complete::{multispace0, satisfy};
+use nom::character::{is_alphanumeric, is_digit, is_hex_digit, is_oct_digit};
 use nom::combinator::{eof, fail, map, opt, peek, recognize};
 use nom::error::{context, ErrorKind};
 use nom::number::complete::recognize_float;
 use nom::sequence::{delimited, preceded};
+use nom::{AsChar, Finish, IResult, Offset};
 
 use crate::sema;
 
@@ -36,7 +36,10 @@ pub(crate) enum Node {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum UnaryOp {
-    Not, // !A
+    Not,     // !A
+    Neg,     // -A
+    Pos,     // +A
+    NegBits, // ~A
 }
 
 // Do we need this.... now?
@@ -52,6 +55,7 @@ pub(crate) enum BinaryOp {
     Match, // A =~ B
 
     Band, // A &  B
+    Bor,  // A &  B
 
     And, // A && B
     Or,  // A || B
@@ -70,6 +74,7 @@ impl<'a> From<Input<'a>> for BinaryOp {
             "<" => BinaryOp::Lt,
             "=~" => BinaryOp::Match,
             "&" => BinaryOp::Band,
+            "|" => BinaryOp::Bor,
             "&&" => BinaryOp::And,
             "||" => BinaryOp::Or,
             _ => unreachable!("Unknown operator {}", i),
@@ -81,6 +86,9 @@ impl<'a> From<Input<'a>> for UnaryOp {
     fn from(i: Input) -> Self {
         match i {
             "!" => UnaryOp::Not,
+            "-" => UnaryOp::Neg,
+            "+" => UnaryOp::Pos, // just for completeness, might beuseful if expressions are generated
+            "~" => UnaryOp::NegBits,
             _ => unreachable!("Unknown operator {}", i),
         }
     }
@@ -159,7 +167,11 @@ pub struct ParseError {
 
 impl ParseError {
     fn new(input: Input, pos: usize, msg: String) -> Self {
-        Self { input: input.to_string(), pos, msg }
+        Self {
+            input: input.to_string(),
+            pos,
+            msg,
+        }
     }
 
     pub fn describe(&self) -> String {
@@ -271,19 +283,19 @@ fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
-            &mut move |i| map(tag("&"), BinaryOp::from)(i),
+            &mut move |i| map(alt((tag("&"), tag("|"))), BinaryOp::from)(i),
             &move |i| unary_expr(d)(i),
             i,
         )
     }
 }
 
-// unary_expr = { ws* ~ ("!" | "-")? ~ factor }
+// unary_expr = { ws* ~ ("!" | "-" | "+" | "~")? ~ factor }
 fn unary_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         let (i, _) = multispace0(i)?;
-        let (i, op) = opt(map(tag("!"), UnaryOp::from))(i)?;
+        let (i, op) = opt(unary_op)(i)?;
         let (i, ue) = factor(d)(i)?;
 
         if let Some(op) = op {
@@ -336,25 +348,22 @@ fn escaped_char(delimiter: Input) -> impl Fn(Input) -> IResult<Input, Input> + '
     move |i| {
         preceded(
             tag("\\"),
-            map(alt((
-                tag(delimiter),
-                tag("n"),
-                tag("r"),
-                tag("0"),
-                tag("t"),
-            )), move |c| {
-                if c == delimiter {
-                    return c;
-                }
+            map(
+                alt((tag(delimiter), tag("n"), tag("r"), tag("0"), tag("t"))),
+                move |c| {
+                    if c == delimiter {
+                        return c;
+                    }
 
-                match c {
-                    "n" => "\n",
-                    "r" => "\r",
-                    "0" => "\0",
-                    "t" => "\t",
-                    _ => unreachable!(),
-                }
-            }),
+                    match c {
+                        "n" => "\n",
+                        "r" => "\r",
+                        "0" => "\0",
+                        "t" => "\t",
+                        _ => unreachable!(),
+                    }
+                },
+            ),
         )(i)
     }
 }
@@ -382,6 +391,11 @@ fn parens_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     }
 }
 
+fn unary_op(i: Input) -> IResult<Input, UnaryOp> {
+    let (i, _) = multispace0(i)?;
+    map(alt((tag("-"), tag("!"), tag("+"), tag("~"))), UnaryOp::from)(i)
+}
+
 fn relop(i: Input) -> IResult<Input, BinaryOp> {
     let (i, _) = multispace0(i)?;
     map(
@@ -403,8 +417,14 @@ fn identifier(i: Input) -> IResult<Input, Arc<Node>> {
     let (i, _) = peek(satisfy(|c| c.is_alpha() || c == '_'))(i)?;
     let (i, ident) = take_till1(|c| !(is_alphanumeric(c as u8) || c == '_'))(i)?;
     let (i, _) = multispace0(i)?;
-    if let Ok((i, index)) = delimited(tag("["), context("parse number", alt((hexnum, octnum, binnum, decnum))), tag("]"))(i) {
-        let num = parse_num(index).map_err(|_| nom::Err::Failure(nom::error::Error::new(i, ErrorKind::Digit)))?;
+    if let Ok((i, index)) = delimited(
+        tag("["),
+        context("parse number", alt((hexnum, octnum, binnum, decnum))),
+        tag("]"),
+    )(i)
+    {
+        let num = parse_num(index)
+            .map_err(|_| nom::Err::Failure(nom::error::Error::new(i, ErrorKind::Digit)))?;
         return Ok((i, Node::from_indexed_identifier(ident, num as usize)));
     } else if let Ok((i, _)) = dot_len(i) {
         return Ok((i, Node::from_array_identifier_len(ident)));
@@ -437,7 +457,11 @@ fn prefixed_num<'a>(
 ) -> IResult<&'a str, &'a str> {
     let (i, _) = multispace0(i)?;
     recognize(|i| {
-        let (i, _) = if let Some(pfx) = pfx { tag(pfx)(i)? } else { (i, "") };
+        let (i, _) = if let Some(pfx) = pfx {
+            tag(pfx)(i)?
+        } else {
+            (i, "")
+        };
         take_till1(|x| !is_digit(x as u8))(i)
     })(i)
 }
@@ -459,8 +483,9 @@ fn binnum(i: Input) -> IResult<Input, Input> {
 }
 
 fn depth(i: Input, d: usize) -> Result<usize, nom::Err<nom::error::Error<Input>>> {
-    if d > 1000 { // this should be plenty!
+    if d > 1000 {
+        // this should be plenty!
         context("recursion depth", fail::<Input, usize, _>)(i)?;
     }
-    Ok(d+1)
+    Ok(d + 1)
 }
