@@ -293,41 +293,17 @@ impl Machine {
 
     pub(crate) fn eval<T: KeyAccessor>(&self, a: &T) -> bool {
         fn eval_<T: KeyAccessor>(mach: &Machine, a: &T) -> bool {
-            let mut mem: SmallVec<[Value; 64]> = smallvec![Value::Nil; mach.max_depth + 1];
-            // SAFETY: We du assert that our stack will not outgrow this array,
-            // additionally, before anything is rad from the memory it must first
-            // be written there.
-            let mem = mem.as_mut_slice();
-
-            assert!(mach.max_depth < mem.len());
-
-            let stack_size = mem.len();
-            let mut cur = 0;
-            let ptr = mem.as_mut_ptr();
+            let mut mem: SmallVec<[Value; 64]> = SmallVec::with_capacity(mach.max_depth + 1);
 
             macro_rules! push {
-                ($e:expr) => {
-                    {
-                        debug_assert!((cur as usize) < stack_size);
-                        unsafe {
-                            let ptr = ptr.add(cur);
-                            cur += 1;
-                            ptr.write($e);
-                        }
-                    }
-                };
+                ($e:expr) => {{
+                    mem.push($e);
+                }};
             }
 
             macro_rules! pop {
                 () => {{
-                    debug_assert!(cur != 0);
-                    unsafe {
-                        cur -= 1;
-                        let ptr = ptr.add(cur);
-                        let x = ptr.read();
-                        ptr.write(Value::Nil);
-                        x
-                    }
+                    mem.pop().unwrap_or(Value::Nil)
                 }};
             }
 
