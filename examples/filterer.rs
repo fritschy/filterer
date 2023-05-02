@@ -3,10 +3,10 @@ use std::io;
 use std::sync::Arc;
 use std::time::Instant;
 
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
-use filterer::{AccessorQuery, compile, KeyAccessor};
+use filterer::{compile, AccessorQuery, KeyAccessor};
 
 #[derive(Clone)]
 struct Message {
