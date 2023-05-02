@@ -54,8 +54,9 @@ pub(crate) enum BinaryOp {
 
     Match, // A =~ B
 
-    Band, // A &  B
-    Bor,  // A &  B
+    Band, // A & B
+    Bor,  // A & B
+    Xor,  // A ^ B
 
     And, // A && B
     Or,  // A || B
@@ -75,6 +76,7 @@ impl<'a> From<Input<'a>> for BinaryOp {
             "=~" => BinaryOp::Match,
             "&" => BinaryOp::Band,
             "|" => BinaryOp::Bor,
+            "^" => BinaryOp::Xor,
             "&&" => BinaryOp::And,
             "||" => BinaryOp::Or,
             _ => unreachable!("Unknown operator {}", i),
@@ -283,7 +285,7 @@ fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
-            &mut move |i| map(alt((tag("&"), tag("|"))), BinaryOp::from)(i),
+            &mut move |i| map(alt((tag("&"), tag("|"), tag("^"))), BinaryOp::from)(i),
             &move |i| unary_expr(d)(i),
             i,
         )

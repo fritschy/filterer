@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::ParseError;
 use regex::Regex;
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
@@ -71,6 +71,7 @@ enum Instr {
     Neg,
     Nop,
     Bor,
+    Xor,
 }
 
 impl fmt::Display for NamedInstr<'_> {
@@ -105,6 +106,7 @@ impl fmt::Display for NamedInstr<'_> {
             Instr::Ge => write!(f, "ge"),
             Instr::Band => write!(f, "band"),
             Instr::Bor => write!(f, "bor"),
+            Instr::Xor => write!(f, "xor"),
             Instr::Match => write!(f, "match"),
             Instr::Not => write!(f, "not"),
             Instr::NegBits => write!(f, "bneg"),
@@ -127,6 +129,7 @@ impl From<BinaryOp> for Instr {
             BinaryOp::Match => Instr::Match,
             BinaryOp::Band => Instr::Band,
             BinaryOp::Bor => Instr::Bor,
+            BinaryOp::Xor => Instr::Xor,
             BinaryOp::Ne => unreachable!("ne operator needs to be mapped to !eq"),
         }
     }
@@ -263,6 +266,7 @@ impl Machine {
                         | Instr::Match
                         | Instr::Band
                         | Instr::Bor
+                        | Instr::Xor
                         | Instr::Ge
                         | Instr::Le
                         | Instr::Gt
@@ -443,6 +447,11 @@ impl Machine {
                         let r = pop!();
                         let l = pop!();
                         push!((l.as_int() | r.as_int()).into());
+                    }
+                    Instr::Xor => {
+                        let r = pop!();
+                        let l = pop!();
+                        push!((l.as_int() ^ r.as_int()).into());
                     }
                 }
             }

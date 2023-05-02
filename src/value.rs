@@ -11,10 +11,10 @@ pub fn parse_num(i: &str) -> isize {
 
 #[derive(Clone)]
 pub(crate) enum Value {
+    Nil,
     Int(isize),
     Str(Arc<String>),
     Re(Arc<Regex>),
-    Nil,
 }
 
 impl From<bool> for Value {
