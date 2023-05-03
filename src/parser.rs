@@ -275,17 +275,39 @@ fn rel_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
         let d = depth(i, d)?;
         generic_expr(
             &mut move |i| map(relop, BinaryOp::from)(i),
-            &move |i| sum_expr(d)(i),
+            &move |i| bor_expr(d)(i),
             i,
         )
     }
 }
 
-fn sum_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
+fn bor_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
     move |i| {
         let d = depth(i, d)?;
         generic_expr(
-            &mut move |i| map(alt((tag("&"), tag("|"), tag("^"))), BinaryOp::from)(i),
+            &mut move |i| map(tag("|"), BinaryOp::from)(i),
+            &move |i| band_expr(d)(i),
+            i,
+        )
+    }
+}
+
+fn band_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(tag("&"), BinaryOp::from)(i),
+            &move |i| xor_expr(d)(i),
+            i,
+        )
+    }
+}
+
+fn xor_expr(d: usize) -> impl Fn(Input) -> IResult<Input, Arc<Node>> {
+    move |i| {
+        let d = depth(i, d)?;
+        generic_expr(
+            &mut move |i| map(tag("^"), BinaryOp::from)(i),
             &move |i| unary_expr(d)(i),
             i,
         )
