@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt;
 use std::num::ParseIntError;
 use std::sync::Arc;
@@ -166,6 +167,8 @@ pub struct ParseError {
     pos: usize,
     msg: String,
 }
+
+impl Error for ParseError {}
 
 impl ParseError {
     fn new(input: Input, pos: usize, msg: String) -> Self {

@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::ParseError;
@@ -11,32 +10,15 @@ use smallvec::SmallVec;
 use crate::parser::{BinaryOp, Node, UnaryOp};
 use crate::value::Value;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum CompileError {
+    #[error("Unknown identifier: {0}")]
     UnknownIdentifier(String),
-    ParseError(ParseError),
+    #[error("{0}")]
+    ParseError(#[from] ParseError),
+    #[error("Maximum stack memory size exceeded ({0})")]
     MaxDepthExceeded(usize),
 }
-
-impl<'a> From<ParseError> for CompileError {
-    fn from(value: ParseError) -> Self {
-        Self::ParseError(value)
-    }
-}
-
-impl Display for CompileError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CompileError::UnknownIdentifier(i) => write!(f, "Unknown Identifier '{i}'"),
-            CompileError::ParseError(pe) => write!(f, "{pe}"),
-            CompileError::MaxDepthExceeded(m) => {
-                write!(f, "Maximum stack memory size exceeded ({m})")
-            }
-        }
-    }
-}
-
-impl Error for CompileError {}
 
 pub trait KeyAccessor {
     fn get_str(&self, k: usize, i: usize) -> Option<Arc<String>>;

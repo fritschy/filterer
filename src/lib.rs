@@ -10,7 +10,7 @@ mod parser;
 mod tests;
 
 // Following is our public interface
-use crate::machine::CompileError;
+pub use crate::machine::CompileError;
 pub use crate::machine::{AccessorQuery, KeyAccessor};
 pub use crate::parser::ParseError;
 
