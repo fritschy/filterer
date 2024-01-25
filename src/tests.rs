@@ -53,7 +53,7 @@ impl AccessorQuery for DataQuery {
 // Compare expr filter with iter filter
 fn compare(expr: &str, filt: impl Fn(&&&str) -> bool) {
     if let Err(p) = compile(expr, &DataQuery).map(|machine| {
-        let expect = DATA.iter().filter(filt).map(|m| *m).collect::<Vec<_>>();
+        let expect = DATA.iter().filter(filt).copied().collect::<Vec<_>>();
 
         println!("Code:\n{}", &machine);
         let d = DATA
@@ -372,13 +372,12 @@ impl AccessorQuery for Data2 {
 
 fn compare2(expr: &str, f: impl Fn(&&Item) -> bool) {
     if let Err(p) = compile(expr, &Data2).map(|machine| {
-        let expect = DATA2.iter().filter(f).map(|m| *m).collect::<Vec<_>>();
+        let expect = DATA2.iter().filter(f).copied().collect::<Vec<_>>();
 
         println!("Code:\n{}", &machine);
         let d = DATA2
             .iter()
-            .filter(|&x| machine.eval(x))
-            .map(|m| *m)
+            .filter(|&x| machine.eval(x)).copied()
             .collect::<Vec<_>>();
         assert_eq!(d, expect);
     }) {
@@ -502,7 +501,7 @@ fn arrays() {
         ];
 
         if let Err(p) = compile(expr, &DataD).map(|machine| {
-            let expect = data.iter().filter(f).map(|m| m).collect::<Vec<_>>();
+            let expect = data.iter().filter(f).collect::<Vec<_>>();
 
             println!("Code:\n{}", &machine);
             let d = data.iter().filter(|x| machine.eval(*x)).collect::<Vec<_>>();
@@ -512,14 +511,14 @@ fn arrays() {
         }
     }
 
-    compare("a[0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
-    compare("a[0] > +0", |x| x.a.len() > 0 && x.a[0] > 0);
-    compare("a[0] > -0", |x| x.a.len() > 0 && x.a[0] > 0);
-    compare("a[0x0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
-    compare("a[0b0] > 0", |x| x.a.len() > 0 && x.a[0] > 0);
+    compare("a[0] > 0", |x| !x.a.is_empty() && x.a[0] > 0);
+    compare("a[0] > +0", |x| !x.a.is_empty() && x.a[0] > 0);
+    compare("a[0] > -0", |x| !x.a.is_empty() && x.a[0] > 0);
+    compare("a[0x0] > 0", |x| !x.a.is_empty() && x.a[0] > 0);
+    compare("a[0b0] > 0", |x| !x.a.is_empty() && x.a[0] > 0);
     compare("a[0o3]", |x| x.a.len() > 3 && x.a[3] > 0);
-    compare("a", |x| x.a.len() > 0 && x.a[0] != 0);
-    compare("i < a[0]", |x| x.a.len() > 0 && x.a[0] > x.i);
+    compare("a", |x| !x.a.is_empty() && x.a[0] != 0);
+    compare("i < a[0]", |x| !x.a.is_empty() && x.a[0] > x.i);
     compare("a[0x10000]", |_| false);
     compare("a[0x10000] == a[0x10000]", |_| false);
     compare("a.len > 1", |x| x.a.len() > 1);
@@ -527,13 +526,13 @@ fn arrays() {
     compare("a.len > +1", |x| x.a.len() > 1);
     compare("a.len == 0", |x| x.a.is_empty());
     compare("i.len", |_| false);
-    compare("s[0] =~ /a/", |x| x.s.len() >= 1 && x.s[0].contains("a"));
+    compare("s[0] =~ /a/", |x| !x.s.is_empty() && x.s[0].contains('a'));
     compare("s[0] =~ /NOT FOUND/", |_| false);
     compare("s[0] =~ /moo/", |x| {
-        x.s.len() >= 1 && x.s[0].contains("moo")
+        !x.s.is_empty() && x.s[0].contains("moo")
     });
     compare("s[0] =~ !/moo/", |x| {
-        x.s.is_empty() || (x.s.len() >= 1 && !x.s[0].contains("moo"))
+        x.s.is_empty() || (!x.s.is_empty() && !x.s[0].contains("moo"))
     });
 
     println!(

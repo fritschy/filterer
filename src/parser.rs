@@ -214,7 +214,7 @@ pub(crate) fn parse(i: Input) -> Result<Arc<Node>, ParseError> {
             let ei = &fe.input;
             let sei = ei as &str;
             let pos = i.as_bytes().offset(sei.as_bytes());
-            return Err(ParseError::new(i, pos, format!("Error at offset {}", pos)));
+            Err(ParseError::new(i, pos, format!("Error at offset {}", pos)))
         }
     }
 }
